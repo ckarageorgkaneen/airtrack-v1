@@ -27,7 +27,7 @@ struct Actuator
 
   public:
 
-    CONST_PIN_TYPE ANALOUGE_PIN = 0;
+    CONST_PIN_TYPE ANALOUGE_PIN = 1;
 
     Actuator (PIN_TYPE motor_push_pin, PIN_TYPE motor_pull_pin,
               int max_distance_pwm, GlobalState* global_state)
@@ -54,6 +54,11 @@ struct Actuator
         //Serial.println("Setup loop done");
     }
 
+    void setMaxDistance(int max_distance_pwm)
+    {
+      this->max_distance_pwm = max_distance_pwm;
+    }
+
     void printState()
     {
       Serial.print("Actuator current state: ");
@@ -73,6 +78,11 @@ struct Actuator
       }
     }
 
+    int getMotorDist()
+    {
+      return analogRead(ANALOUGE_PIN);
+    }
+
     void motorLoop()
     {
       // Serial.print("Motor loop - ");
@@ -82,50 +92,75 @@ struct Actuator
         return;
       }
 
-      int sensor_value = analogRead(ANALOUGE_PIN);
-      if (sensor_value >= this->max_distance_pwm -30) // Leave a bit of buffer
+      #define MIN_DISTANCE 20
+      int sensor_value = this->getMotorDist();
+      // if (sensor_value >= this->max_distance_pwm - 30) // Leave a bit of buffer
+      if (sensor_value >= this->max_distance_pwm)
       {
         this->global_state->actuator_at_max_push = true;
       }
       else
       {
         this->global_state->actuator_at_max_push = false;
+        if (sensor_value <= MIN_DISTANCE)
+        {
+          this->global_state->actuator_at_min_pull = true;
+        }
+        else
+        {
+          this->global_state->actuator_at_min_pull = false;
+        }
+
       }
 
       if (this->current_state == PUSH)
       {
           if (sensor_value >= this->max_distance_pwm)
           {
-              digitalWrite(this->motor_push_pin, LOW);
-              digitalWrite(this->motor_pull_pin, LOW);
+              this->enableStill();
               this->current_state = STILL;
               this->change_required = false;
           }
 
           if (this->change_required)
           {
-              digitalWrite(this->motor_push_pin, HIGH);
-              digitalWrite(this->motor_pull_pin, LOW);
+              this->enablePush();
               this->change_required = false;
           }
       }
       else if (this->current_state == PULL)
       {
-          if (sensor_value <= 20) // Doesn't have to be completely retracted
+          if (sensor_value <= MIN_DISTANCE) // Doesn't have to be completely retracted
           {
-              digitalWrite(this->motor_push_pin, LOW);
-              digitalWrite(this->motor_pull_pin, LOW);
+              this->enableStill();
               this->current_state = STILL;
               this->change_required = false;
           }
 
           if (this->change_required)
           {
-              digitalWrite(this->motor_push_pin, LOW);
-              digitalWrite(this->motor_pull_pin, HIGH);
+              this->enablePull();
               this->change_required = false;
           }
       }
+    }
+
+    void enablePush()
+    {
+       digitalWrite(this->motor_push_pin, HIGH);
+       digitalWrite(this->motor_pull_pin, LOW);
+    }
+
+    void enablePull()
+    {
+        digitalWrite(this->motor_push_pin, LOW);
+        digitalWrite(this->motor_pull_pin, HIGH);
+    }
+
+    void enableStill()
+    {
+       digitalWrite(this->motor_push_pin, LOW);
+       digitalWrite(this->motor_pull_pin, LOW);
     }
 };
 

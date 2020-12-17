@@ -2,16 +2,44 @@
 #include <Wire.h> // Need by sensor.h
 #include <SPI.h>
 #include <Pixy.h>
+#include <Servo.h>
 
 #include "definitions.h"
 #include "leds.h"
 #include "pins.h"
+#include "stats.h"
 #include "sensor.h"
 #include "actuator.h"
+#include "reporter.h"
 
-const bool AUTOMATED_REWARD = false;
+const bool AUTOMATED_REWARD = true;
 const bool SINGLE_REWARD = true;
 const bool FEEDBACK_AUTOMATED_REWARD = false;
+const float threshold = 75;
+const int pumpActivatorPulse = 29;
+
+const bool training = true;
+const int time_until_training = 8000;
+int time_counter=0;
+
+int opto_activation_trial = -1;
+
+typedef struct Maus{
+  float posx[10];
+  float posy[10];
+  float pos_new[2];
+  float pos_old[2];
+  float difference[2];
+  int angle[10];
+  float mean_angle;
+  float velocity;
+  int index;
+  bool optogenetics;
+  bool below_threshold;
+
+}Maus;
+
+struct Maus maus;
 
 GlobalState global_state;
 Sensor sensor = Sensor(Pins.Sensor);
@@ -19,16 +47,58 @@ Actuator actuator = Actuator(Pins.ActuatorPush, Pins.ActuatorPull,
                              global_state.actuator_max_pwm_distance,
                              &global_state);
 Pixy pixy;
+Servo myservo1;
+Servo myservoleft;
+Servo myservoright;
 
 // the setup routine runs once when you press reset:
 void setup()
 {
     Serial.begin(115200);
+    Serial.println("Initializing");
+    Serial.println("Setting up sensor");
     sensor.setup();
+    Serial.println("Setting up LEDs");
     setupLeds();
+    Serial.println("Setting up Pins");
     setupPins();
+    Serial.println("Setting up Lanes");
     setupLanes();
+    Serial.println("Setting up Pixy");
     pixy.init();
+    Serial.println("Pixy is set up");
+
+
+    pinMode(25, INPUT_PULLUP);
+    pinMode(31,INPUT_PULLUP);
+    pinMode(35, INPUT_PULLUP);
+    pinMode(3, OUTPUT);
+    pinMode(4, OUTPUT);
+    pinMode(5, OUTPUT);
+    pinMode(6, OUTPUT);
+    pinMode(9, OUTPUT);
+    pinMode(44, OUTPUT);
+    pinMode(13, OUTPUT);
+    pinMode(23, INPUT);
+    pinMode(pumpActivatorPulse, OUTPUT);
+
+
+    //GPIO Outputs for trigger
+    pinMode(A8, OUTPUT);
+    pinMode(A9, OUTPUT);
+    pinMode(A10, OUTPUT);
+    pinMode(A11, OUTPUT);
+    pinMode(A12, OUTPUT);
+    pinMode(A13, OUTPUT);
+    pinMode(A14, OUTPUT);
+    pinMode(A15, OUTPUT);
+
+    myservo1.attach(2);
+    myservoright.attach(6);
+    myservoleft.attach(7);
+    myservoright.attach(44);
+
+    //pinMode(29, OUTPUT);
 
     for (int i = 0; i < global_state.MOTOR_DURATION_ENTERIES_SIZE; i++)
     {
@@ -44,7 +114,9 @@ void setup()
     global_state.last_reported_light_status = 250;
 
     global_state.actuator_duration_activated = false;
+    Serial.println("Setting up actuator");
     actuator.setup();
+    Serial.println("Actuator is set up");
 
     // We are seeding the random so it would give us reproducible results
     // randomSeed(0);// call randomSeed(analogRead(A3)) for random order on each run
@@ -54,14 +126,58 @@ void setup()
     // Assign last lane id to soeme random value so that it'd be possible to
     // choose lane 0 as the first lane
     global_state.reward_lane_id = -1;
+    global_state.reward_direction = -1;
     createShuffledChoice();
     makeNewRewardLane();
 }
 
 
 // the loop routine runs over and over again forever:
-void loop()
+void loop ()
 {
+//Serial.println(global_state.reward_direction);
+  //#######################################################################################Begin
+  if(digitalRead(25)==LOW)   //Enter Setup
+  {
+    Serial.println("Setup entered");
+     digitalWrite(A9,HIGH);
+    delay(300);
+    while(digitalRead(25)==HIGH)
+    {
+      digitalWrite(3, HIGH);
+      if(digitalRead(35)==LOW)
+      {
+        actuator.enablePush();
+      }
+      else if(digitalRead(31)==LOW)
+      {
+        actuator.enablePull();
+      }
+      else
+      {
+        actuator.enableStill();
+      }
+    }
+    actuator.setMaxDistance(actuator.getMotorDist());
+    actuator.setup();
+    digitalWrite(3, LOW);
+    delay(1000);
+  }
+  digitalWrite(A9,LOW);
+
+  if(digitalRead(23)==HIGH){
+    //turnOnMotor(Pins.SolenoidLeft, global_state.SOLENOID_DURATION);
+    Serial.println("Pump pulse");
+    digitalWrite(pumpActivatorPulse, HIGH);
+    delayMicroseconds(100);
+    digitalWrite(pumpActivatorPulse,LOW);
+  }
+
+
+  //#######################################################################################End
+
+
+
     SubjectLocation subject_location = getSubjectLocation();
     if (subject_location.block_detected)
     {
@@ -75,9 +191,36 @@ void loop()
     bool is_within_reward_lane_angle = isWithinRewardLaneAngle(subject_location);
     bool is_inside_lane = isInsideLane(subject_location);
 
+    move_training_servos(subject_location.angle, is_within_reward_lane_angle);
+
     bool motor_pushed = false;
 
+
+
+
+  if(time_counter<time_until_training+10 && !is_within_reward_lane_angle){
+    time_counter++;
+  }
+
+
+int factor = 100;
+   if(time_counter > time_until_training && training && global_state.Servo1_pos < 160*factor && !is_within_reward_lane_angle){
+    global_state.Servo1_pos += 1;
+    myservo1.write(global_state.Servo1_pos/factor);
+    }
+
+
+
+
+
+
+
+
     SensorTouched touched_sensor = sensor.readInput();
+    if ( !touched_sensor.change_happened )
+    {
+        Stats.REPORT_SENSORS_UNTOUCHED();
+    }
 
     // Serial.print("We are within reward lane");
     if (is_inside_lane)
@@ -96,6 +239,7 @@ void loop()
                 // Serial.print( " and we should fire motor ");
                 //Serial.println("");
                 actuator.setState(Actuator::PUSH);
+
                 if (global_state.last_reported_actuator_status != Actuator::PUSH)
                 {
                     writeStats(Stats.MOTOR_PUSHED());
@@ -146,8 +290,8 @@ void loop()
                         if (global_state.is_automated_reward ||
                             touched_sensor.change_happened)
                         {
-                            checkGiveReward(global_state.is_automated_reward ||
-                                            is_correct_sensor);
+                            checkGiveReward(is_correct_sensor,
+                                            global_state.is_automated_reward);
                         }
                     }
                 }
@@ -168,6 +312,7 @@ void loop()
         if (global_state.was_inside_lane)
         {
             writeStats(Stats.EXITED_LANE(global_state.current_lane));
+
             // Turn off peizo if it was on
             if (global_state.peizo_motor_entry != NULL)
             {
@@ -187,17 +332,46 @@ void loop()
 
     if (subject_location.block_detected && !motor_pushed)
     {
+      //digitalWrite(29,LOW); //########################################################################################
+
         actuator.setState(Actuator::PULL);
         if (global_state.last_reported_actuator_status != Actuator::PULL)
         {
             writeStats(Stats.MOTOR_PULLED());
             global_state.last_reported_actuator_status = Actuator::PULL;
         }
+
+        if (global_state.actuator_at_min_pull)
+        {
+            if (!global_state.reported_motor_min_distance)
+            {
+                writeStats(Stats.MOTOR_MIN_RANGE());
+                global_state.reported_motor_min_distance = true;
+                // TODO: Do it cleanly
+                turnOnMotor(13, 20);
+                //digitalWrite(45, HIGH);
+            }
+        }
+        else
+        {
+            global_state.reported_motor_min_distance = false;
+        }
     }
 
     global_state.was_inside_lane = is_inside_lane;
     turnOffMotor();
     actuator.motorLoop();
+
+    if (global_state.delayed_report)
+    {
+        long int time_now = millis();
+        if (time_now >= global_state.delayed_report)
+        {
+            // TODO: Do it cleanly
+            turnOnMotor(13, 20);
+            global_state.delayed_report = 0;
+        }
+    }
 }
 
 bool isInsideLane(SubjectLocation subject_location)
@@ -281,6 +455,7 @@ bool shouldTriggerMotor(SubjectLocation subject_location)
 
 SubjectLocation getSubjectLocation()
 {
+    // Serial.println("Gettin blocks");
     uint16_t num_of_blocks = pixy.getBlocks();
     //Serial.print("Pixy array size: ");
     //Serial.println(num_of_blocks);
@@ -293,6 +468,14 @@ SubjectLocation getSubjectLocation()
         location.angle = pixy.blocks[0].angle;
         location.x = pixy.blocks[0].x;
         location.y = pixy.blocks[0].y;
+        if (location.angle > 180)
+            location.angle -= 360;
+
+
+        maus = calculateVelocity(maus, location.x, location.y, location.angle);
+        //Serial.println(location.angle);
+
+        Stats.REPORT_PIXY_POSITION(location);
 
         const bool ENABLE_POSITION_PRINT = false;
         if (ENABLE_POSITION_PRINT)
@@ -303,7 +486,9 @@ SubjectLocation getSubjectLocation()
             Serial.print(location.y);
             Serial.print(" angle: ");
             Serial.print(location.angle);
-            Serial.print(" NUm. of blocks: ");
+            Serial.print(" Mouse velocity: ");
+            Serial.print(maus.velocity);
+            Serial.print(" Num. of blocks: ");
             Serial.println(num_of_blocks);
         }
     }
@@ -423,14 +608,19 @@ void checkForceSensorMode(bool is_left_sensor_touched)
     }
 }
 
-void checkGiveReward(bool give_reward)
+void checkGiveReward(bool is_correct_sensor, bool is_automated_reward)
 {
     if (global_state.reward_given)
         return;
 
-    if (give_reward)
+    if (is_correct_sensor || is_automated_reward)
     {
-        writeStats(Stats.REWARD_GIVEN());
+        // Report if reward was given due to correct sensor was touched or
+        // due to wrong sensore touched but automated reward is enabled
+        writeStats(Stats.REWARD_GIVEN(is_correct_sensor == false));
+        // TODO: Clean hacky way
+        global_state.delayed_report = millis() + 2000;
+
         Lane lane = global_state.lanes[global_state.reward_lane_id];
         if (lane.reward_sensor == sensor.RIGHT_ANALOUGE_PIN)
         {
@@ -440,7 +630,11 @@ void checkGiveReward(bool give_reward)
         else if (lane.reward_sensor == sensor.LEFT_ANALOUGE_PIN)
         {
             writeStats(Stats.SOLENOID_LEFT_ON());
-            turnOnMotor(Pins.SolenoidLeft, global_state.SOLENOID_DURATION);
+            Serial.write("Reward given");
+            digitalWrite(pumpActivatorPulse, HIGH);
+            delayMicroseconds(global_state.SOLENOID_DURATION);
+            digitalWrite(pumpActivatorPulse, LOW);
+            //turnOnMotor(Pins.SolenoidLeft, global_state.SOLENOID_DURATION);
         }
         else
         {
@@ -505,13 +699,39 @@ void makeNewRewardLane()
             {
                 createShuffledChoice();
                 new_lane_id = list_ptr[0];
+
             }
         }
 
         global_state.shuffle_list_index++;
     }
 
+
+    //#####################################################easy trial
+    global_state.reward_direction = random(0,2);
+
+    if(global_state.reward_direction == 0){
+      if(global_state.current_lane == 3){
+        new_lane_id = 0;
+      }
+      else
+      new_lane_id = global_state.current_lane + 1;
+    }
+
+    if(global_state.reward_direction == 1){
+      if(global_state.current_lane == 0){
+        new_lane_id = 3;
+      }
+      else
+      new_lane_id = global_state.current_lane - 1;
+    }
+    //######################################################
+
     global_state.reward_lane_id = new_lane_id;
+    Serial.print("New reward lane is: ");
+    Serial.println(global_state.reward_lane_id);
+    Serial.print("New reward rotation direction is: ");
+    Serial.println(global_state.reward_direction);
     global_state.reward_given = false;
 
     // We must assign first thenew lane before calling createShuffledChoice()
@@ -522,10 +742,90 @@ void makeNewRewardLane()
 
     writeStats(Stats.NEW_LANE(new_lane_id));
     writeStats(Stats.NEW_TRIAL(global_state.trial_number));
+
+
+
+    //#########################################################################################################################
+    //Video end trigger
+    digitalWrite(A8, HIGH);
+    digitalWrite(A9, HIGH);
+    digitalWrite(A10, HIGH);
+    delay(100);
+    digitalWrite(A8, LOW);
+    digitalWrite(A9, LOW);
+    digitalWrite(A10, LOW);
+
     global_state.trial_number += 1;
 
+    digitalWrite(A9, HIGH);
+    delay(20);
+    digitalWrite(A9,LOW);
+
     printRewardLane();
+
+    //pylonPD execution Trigger
+    delay(100);
+    digitalWrite(A11, HIGH);
+    delay(20);
+    digitalWrite(A11, LOW);
+    delay(500);
+
+    //Video start trigger
+    digitalWrite(A12, HIGH);
+    digitalWrite(A15, HIGH);
+
+    delay(100);
+
+
+    digitalWrite(A12, LOW);
+    digitalWrite(A15, LOW);
+
+    delay(50);
+
+    //Video Mark trigger (removed, because new camera has issues with channel 4 and ZR-View only supports 3 channels due to reasons)
+
+    digitalWrite(A15, HIGH);
+    //digitalWrite(44, HIGH);  // Video alignment trigger
+    delay(50);
+    digitalWrite(A15, LOW);
+    //digitalWrite(44, LOW);
+
+    time_counter = 0;
+    global_state.Servo1_pos = 200;
+
+    //##########################################################################################################################
+
+
 }
+void failedTrial(){
+  LANE_ID new_lane_id = global_state.NUM_OF_LANES + 1;
+      //##################################################### same as easy trial but without assigning a new reward direction
+
+    if(global_state.reward_direction == 0){
+      if(global_state.current_lane == 3){
+        new_lane_id = 0;
+      }
+      else
+      new_lane_id = global_state.current_lane + 1;
+    }
+
+    if(global_state.reward_direction == 1){
+      if(global_state.current_lane == 0){
+        new_lane_id = 3;
+      }
+      else
+      new_lane_id = global_state.current_lane - 1;
+    }
+    //######################################################
+
+    global_state.reward_lane_id = new_lane_id;
+    Serial.print("New reward lane is: ");
+    Serial.println(global_state.reward_lane_id);
+    Serial.print("New reward rotation direction is: ");
+    Serial.println(global_state.reward_direction);
+    global_state.reward_given = false;
+}
+
 
 void createShuffledChoice()
 {
@@ -534,6 +834,8 @@ void createShuffledChoice()
         Serial.println("Num of lanes is not divisble by random bound");
     }
 
+    // Create a list containing the lanes values (repeated in order). This list
+    // will be shuffled in the next step.
     int j_max = global_state.GUARANTEED_RANDOM_BOUND/global_state.NUM_OF_LANES;
     for (int i = 0; i < global_state.NUM_OF_LANES; i++)
     {
@@ -651,6 +953,27 @@ void setupPins()
 
     pinMode(Pins.PeizoTone, OUTPUT);
     digitalWrite(Pins.PeizoTone, LOW);
+
+    // Initially set all used PWM to OUTPUT and to value Unkown or off (== 0)
+    #ifdef PWM_ENABLED
+        for (int i = 2; i <= 13; i++)
+        {
+            pinMode(i, OUTPUT);
+            analogWrite(i, 0);
+        }
+
+        for (int i = 44; i <= 46; i++)
+        {
+            pinMode(i, OUTPUT);
+            analogWrite(i, 0);
+        }
+
+        // temp change for TTL
+        pinMode(31, OUTPUT);
+        digitalWrite(31, LOW);
+        pinMode(32, OUTPUT);
+        digitalWrite(32, LOW);
+    #endif
 }
 
 void setupLeds()
@@ -723,7 +1046,6 @@ bool isWithinRewardLaneAngle(SubjectLocation subject_location)
         return false;
     }
 
-
     for (int j = 0; j < global_state.NUM_OF_LANES; j++)
     {
         // Sometimes the angle jumps forward and backwards between the  current
@@ -752,15 +1074,74 @@ bool isWithinRewardLaneAngle(SubjectLocation subject_location)
         {
             global_state.current_lane = i;
 
+            //Serial.println(global_state.reward_direction);
+            //Serial.print(" ");
+            //Serial.println(angle);
+
+
+
             if (global_state.last_reported_lane != i)
             {
+             switch(i){  //Here it is decided if the animal went right(0) or left(1)
+              case 0 :
+              if(global_state.last_reported_lane == 1)
+              global_state.rotation = 1;
+              else if(global_state.last_reported_lane == 3)
+              global_state.rotation = 0;
+              else
+              global_state.rotation = -1;
+              break;
+
+              case 1 :
+              if(global_state.last_reported_lane == 2)
+              global_state.rotation = 1;
+              else if(global_state.last_reported_lane == 0)
+              global_state.rotation = 0;
+              else
+              global_state.rotation = -1;
+              break;
+
+              case 2 :
+              if(global_state.last_reported_lane == 3)
+              global_state.rotation = 1;
+              else if(global_state.last_reported_lane == 1)
+              global_state.rotation = 0;
+              else
+              global_state.rotation = -1;
+              break;
+
+              case 3 :
+              if(global_state.last_reported_lane == 0)
+              global_state.rotation = 1;
+              else if(global_state.last_reported_lane == 2)
+              global_state.rotation = 0;
+              else
+              global_state.rotation = -1;
+              break;
+            }
+
+            if(global_state.rotation != global_state.reward_direction){
+              failedTrial();
+              Serial.println("Trial has been failed");
+            }
+
+
                 writeStats(Stats.ENTERED_LANE_RANGE(i));
                 global_state.last_reported_lane = i;
             }
 
-            if (lane.lane_id == global_state.reward_lane_id)
+            //Serial.print(lane.lane_id);     //Debug stuff
+            //Serial.print(global_state.rotation);
+            //Serial.println(global_state.was_inside_lane);
+
+
+            if (lane.lane_id == global_state.reward_lane_id && global_state.rotation == global_state.reward_direction)
             {
                 digitalWrite(Pins.LaneLight, LOW);
+                digitalWrite(Pins.LaneLight2, LOW);
+
+                myservo1.write(10);
+
                 if (global_state.last_reported_light_status != LOW)
                 {
                     writeStats(Stats.LIGHT_OFF());
@@ -768,9 +1149,18 @@ bool isWithinRewardLaneAngle(SubjectLocation subject_location)
                 }
                 return true;
             }
+            else if(global_state.reward_direction == 0){
+                  digitalWrite(Pins.LaneLight, LOW);
+                  digitalWrite(Pins.LaneLight2, HIGH);
+                  return false;
+            }
+              else if(global_state.reward_direction == 1){
+                  digitalWrite(Pins.LaneLight2, LOW);
+                  digitalWrite(Pins.LaneLight, HIGH);
+                  return false;
+              }
             else
             {
-                digitalWrite(Pins.LaneLight, HIGH);
                 if (global_state.last_reported_light_status != HIGH)
                 {
                     writeStats(Stats.LIGHT_ON());
@@ -778,12 +1168,49 @@ bool isWithinRewardLaneAngle(SubjectLocation subject_location)
                 }
                 return false;
             }
+
+
+
+
+
         }
     }
 
     Serial.print("Unexpected code redirection. Subject location angle: ");
     Serial.println(subject_location.angle);
     return false;
+}
+void move_training_servos(int angle, bool is_within_reward_lane_angle){
+  if(global_state.reward_direction == 0){
+    if(inRange(angle, -120,-90) || inRange(angle, -30,0) || inRange(angle, 60,80) || inRange(angle, 160,180)){
+      myservoleft.write(170);
+      if(is_within_reward_lane_angle){
+        myservoright.write(20);
+      }
+    }
+    else{
+      myservoleft.write(20);
+      myservoright.write(170);
+    }
+  }
+  else{
+    if(inRange(angle, -120,-90) || inRange(angle, -30,0) || inRange(angle, 60,80) || inRange(angle, 160,180)){
+      myservoright.write(20);
+      if(is_within_reward_lane_angle){
+        myservoleft.write(170);
+      }
+    }
+    else{
+      myservoleft.write(20);
+      myservoright.write(170);
+    }
+
+  }
+}
+
+bool inRange(int val, int minimum, int maximum)
+{
+  return ((minimum <= val) && (val <= maximum));
 }
 
 void printRewardLane()
@@ -805,15 +1232,19 @@ MotorDurationEntry* turnOnMotor(PIN_TYPE motor_id, long int activation_period)
         {
             do
             {
+                pinMode(motor_id, OUTPUT);
                 digitalWrite(motor_id, HIGH);
+                // if (motor_id == 31 || motor_id == 32)
+                //     pinMode(motor_id, INPUT);
             }
             while (!digitalRead(motor_id));
+            pinMode(motor_id, OUTPUT);
             motor_entry->activated = true;
             motor_entry->motor_id = motor_id;
             motor_entry->activation_time = time_now;
             motor_entry->timeout_period = activation_period;
-            //Serial.print("Setting high on pin: ");
-            //Serial.println(motor_id);
+            Serial.print("Setting high on pin: ");
+            Serial.println(motor_id);
             return motor_entry;
         }
     }
@@ -835,10 +1266,18 @@ void turnOffMotor()
             {
                 do
                 {
+                    Serial.print("Turning off pin: ");
+                    Serial.println(motor_entry->motor_id);
+                    pinMode(motor_entry->motor_id, OUTPUT);
                     digitalWrite(motor_entry->motor_id, LOW);
+                    // if (motor_entry->motor_id == 31 || motor_entry->motor_id == 32)
+                    //     pinMode(motor_entry->motor_id, INPUT);
                 }
                 while (digitalRead(motor_entry->motor_id));
+                pinMode(motor_entry->motor_id, OUTPUT);
                 motor_entry->activated = false;
+                Serial.print("Turned off pin: ");
+                Serial.println(motor_entry->motor_id);
 
                 if (motor_entry->motor_id == Pins.SolenoidRight)
                     writeStats(Stats.SOLENOID_RIGHT_OFF());
@@ -866,4 +1305,102 @@ void writeStats(StatsMessage stat)
     }
     Serial.println("");
     Serial.flush();
+}
+
+Maus calculateVelocity(Maus maus, int newX, int newY, int angle){
+  maus.posx[maus.index] = newX;
+  maus.posy[maus.index] = newY;
+  //maus.angle[maus.index] = sin(angle)*1000;
+
+  //Serial.println((sin((angle/57.296))+1)*120);
+
+  float mean[2] = {0.0,0.0};
+  //float mean_angle = 0;
+
+  for(int i = 0; i<10 ; i++){
+    mean[0] += maus.posx[i];
+    mean[1] += maus.posy[i];
+    //mean_angle += maus.angle[i];
+    //Serial.print(maus.angle[i]);
+    //Serial.print(", ");
+  }
+  //Serial.println();
+
+  mean[0] /= 10;
+  mean[1] /= 10;
+  //maus.mean_angle = asin(mean_angle/10);
+  //Serial.println(maus.mean_angle);
+
+float diff = sqrt(sq(mean[0] - maus.pos_old[0]) + sq(mean[1] - maus.pos_old[1]) );
+maus.difference[0] = mean[0]-maus.pos_old[0];
+maus.difference[1] = mean[1]-maus.pos_old[1];
+
+if(diff<0.2){
+  diff=0;
+}
+
+//Serial.println(maus.difference[1]);
+// Optogenetic pulse randomly every 7 occurences
+
+if(maus.difference[1]>2 && newY > threshold - 5 && newY < threshold + 5){
+  int random_number = random(100);
+  Serial.println(random_number);
+  if(random_number > 70 && opto_activation_trial != global_state.trial_number){
+    digitalWrite(A13, HIGH);
+    Serial.println("Opto-activation)");
+    opto_activation_trial = global_state.trial_number;
+  }
+
+}
+else{
+  digitalWrite(A13, LOW);
+}
+
+/*
+ * if(maus.optogenetics == false &&
+
+
+if(mean[1] < threshold){
+  maus.below_threshold = true;
+}
+else{
+  maus.below_threshold = false;
+}
+ */
+
+analogWrite(13, (sin((angle/57.296))+1)*120);
+//Serial.println(maus.mean_angle);
+//Serial.println(diff);
+//Serial.println(maus.difference[0]);
+//Serial.println((maus.difference[1]+14)*9);
+
+//analogWrite(9, (maus.difference[1]+14)*9);  //uncomment for platform velocity
+analogWrite(9, mean[1]);
+/*
+
+Serial.print(" = sqrt(");
+Serial.print(mean[0]);
+Serial.print(" - ");
+Serial.print(maus.pos_old[0]);
+Serial.print(")^2 + (");
+Serial.print(mean[1]);
+Serial.print(" - ");
+Serial.print(maus.pos_old[1]);
+Serial.print(")^2");
+Serial.print(")");
+Serial.println();
+  */
+
+
+  maus.velocity = diff;
+
+  maus.pos_old[0] = mean[0];
+  maus.pos_old[1] = mean[1];
+  if(maus.index<9){
+    maus.index++;
+  }
+  else{
+    maus.index = 0;
+  }
+  return maus;
 }

@@ -52,20 +52,27 @@ struct MotorDurationEntry
 
 struct GlobalState
 {
+  int Servo1_pos = 0;
+  bool Servo1_dir = true;
+
+
    static const LANE_ID NUM_OF_LANES = 4;
    Lane lanes[NUM_OF_LANES];
-   // Guaranteed boind value must be divisble by num of lanes
+   // Guaranteed bound value must be divisble by num of lanes
    static const int GUARANTEED_RANDOM_BOUND = NUM_OF_LANES*1;
    LANE_ID lane_shuffle_list[GUARANTEED_RANDOM_BOUND];
    size_t shuffle_list_index;
    bool was_inside_lane;
    LANE_ID current_lane;
    LANE_ID reward_lane_id;
+   bool reward_direction;
+   bool rotation;
    SubjectLocation last_subject_location;
    bool actuator_at_max_push;
-   static const long int MAX_PUSH_TIMEOUT = 3000;
+   bool actuator_at_min_pull;
+   static const long int MAX_PUSH_TIMEOUT = 1000;
    static const long int MAX_PUSH_WAIT = 100;
-   static const long int ALLOWED_REWARD_TIMEOUT = 2500;
+   static const long int ALLOWED_REWARD_TIMEOUT = 1000;
    static const long int NO_REWARD_TIMEOUT = 100;
    static const long int PEIZO_TIMEOUT = 1000;
    long int motor_timeout_duration;
@@ -73,25 +80,27 @@ struct GlobalState
    bool actuator_duration_activated;
    bool chose_new_lane;
    bool reward_given;
+   bool in_first_lane;
    MotorDurationEntry *peizo_motor_entry;
 
    LANE_ID last_reported_lane; // Initially report non existing lane
    byte last_reported_light_status; // Assign any random initial value
    byte last_reported_actuator_status; // It's type is Actuator::State
    bool reported_motor_max_distance;
+   bool reported_motor_min_distance;
    bool reported_motor_max_wait;
    bool sensor_was_touched;
 
    // Change to fit the number of motors that you have in your system
-   static const size_t MOTOR_DURATION_ENTERIES_SIZE = 4;
+   static const size_t MOTOR_DURATION_ENTERIES_SIZE = 6;
    MotorDurationEntry motor_duration_entries[MOTOR_DURATION_ENTERIES_SIZE];
 
-   static const int actuator_max_pwm_distance = 870;
-   static const long int SOLENOID_DURATION = 120;
+   int actuator_max_pwm_distance = 700;
+   static const long int SOLENOID_DURATION = 200;
 
    unsigned int trial_number;
 
-   static const long int SAME_SENSOR_MAX_THRESHOLD = 500;
+   static const long int SAME_SENSOR_MAX_THRESHOLD = 5;
    static const long int FORCE_OTHER_SENSOR = 3;
    static const long int FEEDBACK_AUTOMATED_REWARD_THRESHOLD = 3;
    bool last_sensor_touched_left;
@@ -101,6 +110,8 @@ struct GlobalState
    int miss_or_wrong_touch_count;
 
    bool is_automated_reward;
+
+   long int delayed_report;
 };
 
 struct DistancesStruct
@@ -116,8 +127,8 @@ struct DistancesStruct
         this->x_threshold_min = 100;
         this->x_threshold_max = 350;
         this->y_threshold_min = 2;
-        this->y_threshold_max = 90;
-        this->y_motor_threshold = 35;
+        this->y_threshold_max = 80;
+        this->y_motor_threshold = 45;
     }
 } Distances;
 
@@ -143,54 +154,5 @@ struct StatsMessage
       this->parameter = -1;
     }
 };
-
-struct StatsStruct
-{
-    StatsMessage ENTERED_LANE(short lane) {return StatsMessage(0, "Entered lane\0", lane + 1);}
-    StatsMessage EXITED_LANE(short lane) {return StatsMessage(1, "Exited lane\0", lane + 1);}
-
-    StatsMessage MOTOR_PUSHED() {return StatsMessage(10, "Motor is pushed\0");}
-    StatsMessage MOTOR_PULLED() {return StatsMessage(11, "Motor is pulled\0");}
-    StatsMessage MOTOR_MAX_RANGE() {return StatsMessage(12, "Motor is at max distance\0");}
-    // Next one is not reported yet
-    StatsMessage MOTOR_MIN_RANGE() {return StatsMessage(13, "Motor is at min distance\0");}
-    StatsMessage MOTOR_WAIT_DONE() {return StatsMessage(14, "Motor wait time is is done.\0");}
-
-    StatsMessage ENTERED_LANE_RANGE(short lane) {return StatsMessage(20, "Entered rotation range of lane\0", lane + 1);}
-
-    StatsMessage CORRECT_SENSOR_TOUCHED() {return StatsMessage(30, "Correct sensor touched\0");}
-    StatsMessage WRONG_SENSOR_TOUCHED() {return StatsMessage(31, "Wrong sensor touched\0");}
-
-    StatsMessage RIGHT_SENSOR_TOUCHED() {return StatsMessage(35, "R-located sensor touched\0");}
-    StatsMessage LEFT_SENSOR_TOUCHED() {return StatsMessage(36, "L-located sensor touched\0");}
-    // Next one is not reported yet
-    StatsMessage OTHER_SENSOR_TOUCHED(short sensor) {return StatsMessage(37, "Other sensor touched - Sensor nr.\0", sensor);}
-
-    StatsMessage REWARD_GIVEN() {return StatsMessage(40, "Giving reward\0");}
-    StatsMessage REWARD_NOT_GIVEN() {return StatsMessage(41, "Not giving reward\0");}
-    StatsMessage MISS_DECISION() {return StatsMessage(42, "No Decision was made in time\0");}
-
-    StatsMessage NEW_LANE(short lane) {return StatsMessage(50, "New lane chosen\0", lane + 1);}
-    StatsMessage NEW_TRIAL(short trial) {return StatsMessage(55, "Trial number\0", trial);}
-
-    StatsMessage LIGHT_ON() {return StatsMessage(60, "Cue light turned on\0");}
-    StatsMessage LIGHT_OFF() {return StatsMessage(61, "Cue light turned off\0");}
-
-    StatsMessage SOLENOID_RIGHT_ON() {return StatsMessage(70, "R-located solenoid turned on\0");}
-    StatsMessage SOLENOID_RIGHT_OFF() {return StatsMessage(71, "R-located solenoid turned off\0");}
-    StatsMessage SOLENOID_LEFT_ON() {return StatsMessage(72, "L-located solenoid turned on\0");}
-    StatsMessage SOLENOID_LEFT_OFF() {return StatsMessage(73, "L-located solenoid turned off\0");}
-
-    StatsMessage FORCE_SENSOR_ON(bool is_left)
-    {
-        char* msg = is_left ? (char*)"Force sensor mode on (left)\0" :
-                              (char*)"Force sensor mode on (right)\0";
-        return StatsMessage(80, msg, is_left);
-    }
-    StatsMessage FORCE_SENSOR_OFF() {return StatsMessage(81, "Force sensor mode is off\0");}
-    StatsMessage FEEDBACK_AUTOMATED_ON() {return StatsMessage(82, "Feedback automated on\0");}
-    StatsMessage FEEDBACK_AUTOMATED_OFF() {return StatsMessage(83, "Feedback automated off\0");}
-} Stats;
-
 
 #endif

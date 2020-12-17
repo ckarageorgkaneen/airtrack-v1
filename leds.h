@@ -8,8 +8,8 @@ struct LedsStruct
 {
     // CONST_PIN_TYPE Unused = 1;
 
-    CONST_PIN_TYPE SensorLeft = 11;
-    CONST_PIN_TYPE SensorRight = 12;
+    CONST_PIN_TYPE SensorLeft = 18;
+    CONST_PIN_TYPE SensorRight = 19;
 
     //CONST_PIN_TYPE Solenoid = 9;
 

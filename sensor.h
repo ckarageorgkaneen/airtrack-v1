@@ -80,12 +80,12 @@ struct Sensor
       }
       if (sensor_touched.change_happened)
       {
-        Serial.print("Returning sensor_touched: change_happened: ");
-        Serial.print(sensor_touched.change_happened ? "true" : "false");
-        Serial.print(" left_sensor: ");
-        Serial.print(sensor_touched.left_sensor ? "touched" : "untouched");
-        Serial.print(" right_sensor: ");
-        Serial.println(sensor_touched.right_sensor ? "touch" : "untouched");
+        //Serial.print("Returning sensor_touched: change_happened: ");
+        //Serial.print(sensor_touched.change_happened ? "true" : "false");
+        //Serial.print(" left_sensor: ");
+        //Serial.print(sensor_touched.left_sensor ? "touched" : "untouched");
+        //Serial.print(" right_sensor: ");
+        //Serial.println(sensor_touched.right_sensor ? "touch" : "untouched");
       }
       return sensor_touched;
     }
@@ -132,7 +132,7 @@ struct Sensor
       // Section C - Sets touch and release thresholds for each electrode
       // #define NEW_TOU_THRESH TOU_THRESH // 0x10
       // #define NEW_REL_THRESH REL_THRESH // 0x02
-      #define NEW_TOU_THRESH 0x02
+      #define NEW_TOU_THRESH 0x09
       #define NEW_REL_THRESH 0x35
 
       set_register(0x5A, ELE0_T, NEW_TOU_THRESH);
@@ -162,8 +162,11 @@ struct Sensor
       set_register(0x5A, ELE8_T, NEW_TOU_THRESH);
       set_register(0x5A, ELE8_R, NEW_REL_THRESH);
 
-      set_register(0x5A, ELE9_T, NEW_TOU_THRESH);
-      set_register(0x5A, ELE9_R, NEW_REL_THRESH);
+      #define NEW_TOU_THRESH_SPECIAL 0x01
+      #define NEW_REL_THRESH_SPECIAL 0x35
+
+      set_register(0x5A, ELE9_T, NEW_TOU_THRESH_SPECIAL);
+      set_register(0x5A, ELE9_R, NEW_REL_THRESH_SPECIAL);
 
       set_register(0x5A, ELE10_T, NEW_TOU_THRESH);
       set_register(0x5A, ELE10_R, NEW_REL_THRESH);
