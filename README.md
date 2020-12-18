@@ -1,3 +1,3 @@
-# airtrack
+# airtrack-arduino
 
-This is the code for the Air-Track project. Find more informatoin under [neuro-airtrack.com/](http://www.neuro-airtrack.com/).
+The arduino logic implemented for the Air-Track project. Find more informatoin under [neuro-airtrack.com/](http://www.neuro-airtrack.com/).
