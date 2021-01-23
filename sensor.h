@@ -92,12 +92,14 @@ struct Sensor
 
     void setup()
     {
+      Serial.println("Setting up sensor.");
       static bool initialize_once = false;
       if (!initialize_once)
       {
         this->setupOnce();
         initialize_once = true;
       }
+      Serial.println("Done setting up sensor.");
     }
 
   private:

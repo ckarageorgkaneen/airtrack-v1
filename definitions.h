@@ -50,6 +50,21 @@ struct MotorDurationEntry
     long int timeout_period;
 };
 
+struct Maus
+{
+  float posx[10];
+  float posy[10];
+  float pos_new[2];
+  float pos_old[2];
+  float difference[2];
+  int angle[10];
+  float mean_angle;
+  float velocity;
+  int index;
+  bool optogenetics;
+  bool below_threshold;
+};
+
 struct GlobalState
 {
   int Servo1_pos = 0;

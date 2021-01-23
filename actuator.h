@@ -41,6 +41,7 @@ struct Actuator
 
     void setup()
     {
+        Serial.println("Setting up actuator.");
         this->global_state->actuator_at_max_push = false;
         // Serial.println("Setting up actiator");
         this->setState(PULL);
@@ -52,6 +53,7 @@ struct Actuator
             //Serial.println(this->current_state);
         }
         //Serial.println("Setup loop done");
+        Serial.println("Done setting up actuator.");
     }
 
     void setMaxDistance(int max_distance_pwm)
