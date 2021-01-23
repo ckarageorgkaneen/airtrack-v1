@@ -1,4 +1,4 @@
-#import <Arduino.h>
+#include <Arduino.h>
 #include <Wire.h> // Need by sensor.h
 #include <SPI.h>
 #include <Pixy.h>

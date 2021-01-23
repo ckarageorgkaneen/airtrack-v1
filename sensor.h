@@ -1,7 +1,7 @@
 #ifndef SENSOR_MODULE
 #define SENSOR_MODULE
 
-#import <Arduino.h>
+#include <Arduino.h>
 // #include "I2C/I2C.cpp"
 #include <Wire.h>
 #include "mpr121.h"

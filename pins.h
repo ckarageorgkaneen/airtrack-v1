@@ -1,7 +1,7 @@
 #ifndef PINS_MODULE
 #define PINS_MODULE
 
-#import <Arduino.h>
+#include <Arduino.h>
 #include "definitions.h"
 
 struct PinStruct
@@ -36,23 +36,25 @@ struct PinStruct
 
     CONST_PIN_TYPE PeizoTone = 7;
 
-#else #if def ARDUINO_MEGA
-    // Pins configuration for arduino mega
-    CONST_PIN_TYPE Sensor = 38;
+#else
+    #ifdef ARDUINO_MEGA
+        // Pins configuration for arduino mega
+        CONST_PIN_TYPE Sensor = 38;
 
-    CONST_PIN_TYPE ActuatorPush = 30;
-    CONST_PIN_TYPE ActuatorPull = 32;
+        CONST_PIN_TYPE ActuatorPush = 30;
+        CONST_PIN_TYPE ActuatorPull = 32;
 
-    // 26 and 28 are free
+        // 26 and 28 are free
 
-    CONST_PIN_TYPE SolenoidLeft = 22;
-    CONST_PIN_TYPE SolenoidRight = 24;
+        CONST_PIN_TYPE SolenoidLeft = 22;
+        CONST_PIN_TYPE SolenoidRight = 24;
 
-    CONST_PIN_TYPE LaneLight = 27;
-    CONST_PIN_TYPE LaneLight2 = A14;
+        CONST_PIN_TYPE LaneLight = 27;
+        CONST_PIN_TYPE LaneLight2 = A14;
 
-    CONST_PIN_TYPE PeizoTone = 29;
-#endif #endif
+        CONST_PIN_TYPE PeizoTone = 29;
+    #endif
+#endif
 
 
     // Has no effect except on arduino mega

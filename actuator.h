@@ -1,7 +1,7 @@
 #ifndef ACTUATOR_MODULE
 #define ACTUATOR_MODULE
 
-#include "Arduino.h"
+#include <Arduino.h>
 #include "definitions.h"
 
 struct Actuator

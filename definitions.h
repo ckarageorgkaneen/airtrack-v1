@@ -1,7 +1,7 @@
 #ifndef DEFINITIONS_MODULE
 #define DEFINITIONS_MODULE
 
-#import <Arduino.h>
+#include <Arduino.h>
 
 // CONST_PIN_TYPE types cannot change their values after first declartion
 // typedef static const unsigned int CONST_PIN_TYPE;
@@ -137,17 +137,17 @@ struct DistancesStruct
 struct StatsMessage
 {
   byte event_id;
-  char* msg;
+  char const* msg;
   short parameter;
 
-  StatsMessage(byte event_id, char* msg, short parameter)
+  StatsMessage(byte event_id, char const* msg, short parameter)
   {
       this->event_id = event_id;
       this->msg = msg;
       this->parameter = parameter;
   }
 
-  StatsMessage(byte event_id, char* msg)
+  StatsMessage(byte event_id, char const* msg)
   {
       this->event_id = event_id;
       this->msg = msg;

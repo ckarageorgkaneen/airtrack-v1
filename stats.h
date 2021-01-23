@@ -2,7 +2,7 @@
 #define STATS_MODULE
 
 
-#import <Arduino.h>
+#include <Arduino.h>
 #include "definitions.h"
 #include "pins.h"
 #include "reporter.h"

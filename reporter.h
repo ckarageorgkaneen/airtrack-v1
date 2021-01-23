@@ -1,7 +1,7 @@
 #ifndef REPORTER_MODULE
 #define REPORTER_MODULE
 
-#import <Arduino.h>
+#include <Arduino.h>
 #include "definitions.h"
 
 #define PWM_(INDEX, TOTAL)  (byte)((255.0/TOTAL)*INDEX)

@@ -1,7 +1,7 @@
 #ifndef LEDS_MODULE
 #define LEDS_MODULE
 
-#import <Arduino.h>
+#include <Arduino.h>
 #include "definitions.h"
 
 struct LedsStruct
