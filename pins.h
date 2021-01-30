@@ -34,7 +34,7 @@ struct PinStruct
 
     CONST_PIN_TYPE LaneLight = 6;
 
-    CONST_PIN_TYPE PeizoTone = 7;
+    CONST_PIN_TYPE PiezoTone = 7;
 
 #else
     #ifdef ARDUINO_MEGA
@@ -52,7 +52,7 @@ struct PinStruct
         CONST_PIN_TYPE LaneLight = 27;
         CONST_PIN_TYPE LaneLight2 = A14;
 
-        CONST_PIN_TYPE PeizoTone = 29;
+        CONST_PIN_TYPE PiezoTone = 29;
     #endif
 #endif
 

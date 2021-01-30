@@ -418,7 +418,7 @@ void checkGiveReward(bool is_correct_sensor, bool is_automated_reward)
     //Serial.println("No reward");
     writeStats(Stats.REWARD_NOT_GIVEN());
     setActuatorTimeout(global_state.NO_REWARD_TIMEOUT);
-    global_state.peizo_motor_entry = turnOnMotor(Pins.PeizoTone,
+    global_state.piezo_motor_entry = turnOnMotor(Pins.PiezoTone,
                                                  global_state.PEIZO_TIMEOUT);
   }
   global_state.reward_given = true;
@@ -673,9 +673,9 @@ void setupPins()
   // Lane Light
   pinMode(Pins.LaneLight, OUTPUT);
   digitalWrite(Pins.LaneLight, LOW);
-  // Peizo Tone
-  pinMode(Pins.PeizoTone, OUTPUT);
-  digitalWrite(Pins.PeizoTone, LOW);
+  // Piezo Tone
+  pinMode(Pins.PiezoTone, OUTPUT);
+  digitalWrite(Pins.PiezoTone, LOW);
   // Initially set all used PWM to OUTPUT and to value Unkown or off (== 0)
   #ifdef PWM_ENABLED
     for (int i = 2; i <= 13; i++)
@@ -1136,16 +1136,16 @@ void exitLane()
   if (global_state.was_inside_lane)
   {
     writeStats(Stats.EXITED_LANE(global_state.current_lane));
-    // Turn off peizo if it was on
-    if (global_state.peizo_motor_entry != NULL)
+    // Turn off piezo if it was on
+    if (global_state.piezo_motor_entry != NULL)
     {
       do
       {
-        digitalWrite(global_state.peizo_motor_entry->motor_id, LOW);
+        digitalWrite(global_state.piezo_motor_entry->motor_id, LOW);
       }
-      while (digitalRead(global_state.peizo_motor_entry->motor_id));
-      global_state.peizo_motor_entry->activated = false;
-      global_state.peizo_motor_entry = NULL;
+      while (digitalRead(global_state.piezo_motor_entry->motor_id));
+      global_state.piezo_motor_entry->activated = false;
+      global_state.piezo_motor_entry = NULL;
     }
   }
   global_state.was_inside_lane = false;

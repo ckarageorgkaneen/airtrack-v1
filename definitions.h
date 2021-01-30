@@ -96,7 +96,7 @@ struct GlobalState
    bool chose_new_lane;
    bool reward_given;
    bool in_first_lane;
-   MotorDurationEntry *peizo_motor_entry;
+   MotorDurationEntry *piezo_motor_entry;
 
    LANE_ID last_reported_lane; // Initially report non existing lane
    byte last_reported_light_status; // Assign any random initial value
