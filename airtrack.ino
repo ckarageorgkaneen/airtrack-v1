@@ -13,6 +13,7 @@
 #include "actuator.h"
 #include "reporter.h"
 
+#define DEBUG false
 #define AUTOMATED_REWARD true
 #define SINGLE_REWARD true
 #define FEEDBACK_AUTOMATED_REWARD false
@@ -40,7 +41,6 @@ bool is_within_reward_lane_angle = false;
 bool is_inside_lane = false;
 bool motor_pushed = false;
 bool is_correct_sensor = false;
-bool should_pull_actuator = false;
 SensorTouched touched_sensor = SensorTouched(false, false);
 SubjectLocation subject_location;
 
@@ -48,26 +48,24 @@ void initialize();
 void makeNewRewardLane();
 void enterLane();
 void exitLane();
+void turnOffPiezo();
+void outsideLaneFunc();
 
 struct StateStruct
 {
-  State* INIT;
-  State* NEW_REWARD_LANE;
-  State* INSIDE_LANE;
-  State* OUTSIDE_LANE;
-  StateStruct()
-  {
-    this->INIT = new State(initialize, NULL, NULL);
-    this->NEW_REWARD_LANE = new State(makeNewRewardLane, NULL, NULL);
-    this->INSIDE_LANE = new State(enterLane, enterLane, NULL);
-    this->OUTSIDE_LANE = new State(exitLane, NULL, NULL);
-  }
+  State* INIT = new State(initialize, NULL, NULL);
+  State* NEW_REWARD_LANE = new State(makeNewRewardLane, NULL, NULL);
+  State* INSIDE_LANE = new State(enterLane, NULL, NULL);
+  State* EXITED_LANE = new State(exitLane, NULL, NULL);
+  State* TURN_OFF_PIEZO = new State(turnOffPiezo, NULL, NULL);
+  State* OUTSIDE_LANE = new State(outsideLaneFunc, NULL, NULL);
 };
 
 enum EventEnum
 {
   EVENT_ENTER_LANE,
   EVENT_EXIT_LANE,
+  EVENT_TURN_OFF_PIEZO,
 };
 
 struct StateStruct state;
@@ -96,15 +94,30 @@ void setup()
     NULL);
   fsm.add_transition(
     state.INSIDE_LANE,
-    state.OUTSIDE_LANE,
+    state.EXITED_LANE,
     EVENT_EXIT_LANE,
+    NULL);
+  fsm.add_transition(
+    state.EXITED_LANE,
+    state.TURN_OFF_PIEZO,
+    EVENT_TURN_OFF_PIEZO,
+    NULL);
+  fsm.add_timed_transition(
+    state.EXITED_LANE,
+    state.OUTSIDE_LANE,
+    NO_DELAY,
+    NULL);
+  fsm.add_timed_transition(
+    state.TURN_OFF_PIEZO,
+    state.OUTSIDE_LANE,
+    NO_DELAY,
     NULL);
 }
 
 void loop()
 {
   resetSystem();
-  checkInsideLane();
+  triggerNewEvents();
   fsm.run_machine();
 }
 
@@ -126,9 +139,8 @@ void initialize()
 
 void resetSystem()
 {
-  should_pull_actuator = subject_location.block_detected && !motor_pushed;
+  bool should_pull_actuator = subject_location.block_detected && !motor_pushed;
   if (should_pull_actuator) pullActuator();
-  global_state.was_inside_lane = is_inside_lane;
   turnOffMotors();
   actuator.motorLoop();
   if (global_state.delayed_report)
@@ -162,10 +174,29 @@ void resetSystem()
     Stats.REPORT_SENSORS_UNTOUCHED();
 }
 
-void checkInsideLane()
+void triggerEnterExitLaneEvent()
 {
   event = is_inside_lane ? EVENT_ENTER_LANE : EVENT_EXIT_LANE;
+  #if DEBUG
+  Serial.println("Triggering ENTER OR EXIT LANE EVENT");
+  #endif
   fsm.trigger(event);
+}
+
+void triggerTurnOffPiezoEvent()
+{
+  if (global_state.piezo_motor_entry != NULL) {
+    #if DEBUG
+    Serial.println("Triggering TURN OFF PIEZO EVENT");
+    #endif
+    fsm.trigger(EVENT_TURN_OFF_PIEZO);
+  }
+}
+
+void triggerNewEvents()
+{
+  triggerEnterExitLaneEvent();
+  triggerTurnOffPiezoEvent();
 }
 
 bool isInsideLane()
@@ -187,7 +218,11 @@ bool isInsideLane()
 void resetIsInsideLaneFlags()
 {
   is_within_reward_lane_angle = isWithinRewardLaneAngle();
+  #if DEBUG
+  is_inside_lane = !global_state.was_inside_lane;
+  #else
   is_inside_lane = isInsideLane();
+  #endif
 }
 
 bool shouldTriggerMotor()
@@ -418,8 +453,7 @@ void checkGiveReward(bool is_correct_sensor, bool is_automated_reward)
     //Serial.println("No reward");
     writeStats(Stats.REWARD_NOT_GIVEN());
     setActuatorTimeout(global_state.NO_REWARD_TIMEOUT);
-    global_state.piezo_motor_entry = turnOnMotor(Pins.PiezoTone,
-                                                 global_state.PEIZO_TIMEOUT);
+    global_state.piezo_motor_entry = turnOnMotor(Pins.PiezoTone, global_state.PEIZO_TIMEOUT);
   }
   global_state.reward_given = true;
 }
@@ -785,7 +819,6 @@ void setupGlobalState()
   }
   global_state.is_automated_reward = AUTOMATED_REWARD;
   global_state.trial_number = 0;
-  global_state.was_inside_lane = false;
   // Initially report non existing lane
   global_state.last_reported_lane = global_state.NUM_OF_LANES + 1;
   // Assign any random initial value
@@ -1130,7 +1163,7 @@ void enterLane()
   }
 }
 
-void exitLane()
+void OLD_exitLane()
 {
   Serial.println("In exitLane()");
   if (global_state.was_inside_lane)
@@ -1148,6 +1181,38 @@ void exitLane()
       global_state.piezo_motor_entry = NULL;
     }
   }
+  global_state.was_inside_lane = false;
+  global_state.reported_motor_max_distance = false;
+}
+
+void exitLane()
+{
+  Serial.println("In exitLane()");
+  writeStats(Stats.EXITED_LANE(global_state.current_lane));
+  #if DEBUG
+  MotorDurationEntry* temp = new MotorDurationEntry();
+  global_state.piezo_motor_entry = temp;
+  #endif
+}
+
+void turnOffPiezo()
+{
+  Serial.println("In turnOffPiezo()");
+  do
+    digitalWrite(global_state.piezo_motor_entry->motor_id, LOW);
+  #if DEBUG
+  while (false);
+  free(global_state.piezo_motor_entry);
+  #else
+  while (digitalRead(global_state.piezo_motor_entry->motor_id));
+  #endif
+  global_state.piezo_motor_entry->activated = false;
+  global_state.piezo_motor_entry = NULL;
+}
+
+void outsideLaneFunc()
+{
+  Serial.println("In outsideLaneFunc()");
   global_state.was_inside_lane = false;
   global_state.reported_motor_max_distance = false;
 }
