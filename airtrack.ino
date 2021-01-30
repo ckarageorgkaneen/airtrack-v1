@@ -66,8 +66,8 @@ struct StateStruct
 
 enum EventEnum
 {
-  ENTER_LANE_EVENT,
-  EXIT_LANE_EVENT,
+  EVENT_ENTER_LANE,
+  EVENT_EXIT_LANE,
 };
 
 struct StateStruct state;
@@ -92,12 +92,12 @@ void setup()
   fsm.add_transition(
     state.OUTSIDE_LANE,
     state.INSIDE_LANE,
-    ENTER_LANE_EVENT,
+    EVENT_ENTER_LANE,
     NULL);
   fsm.add_transition(
     state.INSIDE_LANE,
     state.OUTSIDE_LANE,
-    EXIT_LANE_EVENT,
+    EVENT_EXIT_LANE,
     NULL);
 }
 
@@ -164,7 +164,7 @@ void resetSystem()
 
 void checkInsideLane()
 {
-  event = is_inside_lane ? ENTER_LANE_EVENT : EXIT_LANE_EVENT;
+  event = is_inside_lane ? EVENT_ENTER_LANE : EVENT_EXIT_LANE;
   fsm.trigger(event);
 }
 
