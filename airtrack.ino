@@ -44,86 +44,118 @@ bool is_correct_sensor = false;
 SensorTouched touched_sensor = SensorTouched(false, false);
 SubjectLocation subject_location;
 
-void initialize();
+void initSystem();
 void makeNewRewardLane();
 void enterLane();
 void exitLane();
 void turnOffPiezo();
 void outsideLaneFunc();
+void resetSystem();
+void pullActuator();
+void resetMotors();
 
 struct StateStruct
 {
-  State* INIT = new State(initialize, NULL, NULL);
-  State* NEW_REWARD_LANE = new State(makeNewRewardLane, NULL, NULL);
+  State* INITIALIZE = new State(initSystem, NULL, NULL);
+  State* RESET_SYSTEM = new State(resetSystem, NULL, NULL);
   State* INSIDE_LANE = new State(enterLane, NULL, NULL);
-  State* EXITED_LANE = new State(exitLane, NULL, NULL);
+  State* EXIT_LANE = new State(exitLane, NULL, NULL);
   State* TURN_OFF_PIEZO = new State(turnOffPiezo, NULL, NULL);
   State* OUTSIDE_LANE = new State(outsideLaneFunc, NULL, NULL);
+  State* PULL_ACTUATOR = new State(pullActuator, NULL, NULL);
+  State* RESET_MOTORS = new State(resetMotors, NULL, NULL);
 };
 
 enum EventEnum
 {
+  EVENT_RESET_SYSTEM,
   EVENT_ENTER_LANE,
   EVENT_EXIT_LANE,
   EVENT_TURN_OFF_PIEZO,
+  EVENT_OUTSIDE_LANE,
+  EVENT_PULL_ACTUATOR,
+  EVENT_RESET_MOTORS,
 };
 
 struct StateStruct state;
 enum EventEnum event;
-Fsm fsm(state.INIT);
+Fsm fsm(state.INITIALIZE);
 
 void setup()
 {
   Serial.begin(115200);
-  fsm.add_timed_transition(
-    state.INIT,
-    state.NEW_REWARD_LANE,
-    NO_DELAY,
-    NULL);
-  fsm.run_machine();
-  fsm.check_timed_transitions();
-  fsm.add_timed_transition(
-    state.NEW_REWARD_LANE,
-    state.OUTSIDE_LANE,
-    NO_DELAY,
+  fsm.add_transition(
+    state.INITIALIZE,
+    state.RESET_SYSTEM,
+    EVENT_RESET_SYSTEM,
     NULL);
   fsm.add_transition(
-    state.OUTSIDE_LANE,
+    state.RESET_SYSTEM,
     state.INSIDE_LANE,
     EVENT_ENTER_LANE,
     NULL);
   fsm.add_transition(
     state.INSIDE_LANE,
-    state.EXITED_LANE,
+    state.PULL_ACTUATOR,
+    EVENT_PULL_ACTUATOR,
+    NULL);
+  fsm.add_transition(
+    state.RESET_SYSTEM,
+    state.EXIT_LANE,
     EVENT_EXIT_LANE,
     NULL);
   fsm.add_transition(
-    state.EXITED_LANE,
+    state.EXIT_LANE,
     state.TURN_OFF_PIEZO,
     EVENT_TURN_OFF_PIEZO,
     NULL);
-  fsm.add_timed_transition(
-    state.EXITED_LANE,
+  fsm.add_transition(
     state.OUTSIDE_LANE,
-    NO_DELAY,
+    state.PULL_ACTUATOR,
+    EVENT_PULL_ACTUATOR,
     NULL);
-  fsm.add_timed_transition(
+  fsm.add_transition(
+    state.EXIT_LANE,
+    state.OUTSIDE_LANE,
+    EVENT_OUTSIDE_LANE,
+    NULL);
+  fsm.add_transition(
     state.TURN_OFF_PIEZO,
     state.OUTSIDE_LANE,
-    NO_DELAY,
+    EVENT_OUTSIDE_LANE,
     NULL);
+  fsm.add_transition(
+    state.OUTSIDE_LANE,
+    state.RESET_MOTORS,
+    EVENT_RESET_MOTORS,
+    NULL);
+  fsm.add_transition(
+    state.INSIDE_LANE,
+    state.RESET_MOTORS,
+    EVENT_RESET_MOTORS,
+    NULL);
+  fsm.add_transition(
+    state.PULL_ACTUATOR,
+    state.RESET_MOTORS,
+    EVENT_RESET_MOTORS,
+    NULL);
+  fsm.add_transition(
+    state.RESET_MOTORS,
+    state.RESET_SYSTEM,
+    EVENT_RESET_SYSTEM,
+    NULL);
+  fsm.run_machine();
 }
 
 void loop()
 {
-  resetSystem();
   triggerNewEvents();
   fsm.run_machine();
 }
 
-void initialize()
+void initSystem()
 {
-  Serial.println("Initializing Air-Track.");
+  Serial.println("Initializing system.");
   sensor.setup();
   actuator.setup();
   setupLeds();
@@ -134,25 +166,14 @@ void initialize()
   // We are seeding the random so it would give us reproducible results
   // randomSeed(0);// call randomSeed(analogRead(A3)) for random order on each run
   randomSeed(analogRead(A3));
-  Serial.println("Done initializing Air-Track.");
+  createShuffledChoice();
+  makeNewRewardLane();
+  Serial.println("Done initializing system.");
 }
 
 void resetSystem()
 {
-  bool should_pull_actuator = subject_location.block_detected && !motor_pushed;
-  if (should_pull_actuator) pullActuator();
-  turnOffMotors();
-  actuator.motorLoop();
-  if (global_state.delayed_report)
-  {
-    long int time_now = millis();
-    if (time_now >= global_state.delayed_report)
-    {
-        // TODO: Do it cleanly
-        turnOnMotor(13, 20);
-        global_state.delayed_report = 0;
-    }
-  }
+  Serial.println("In resetSystem().");
   if(digitalRead(25) == LOW)
     resetActuator();
   digitalWrite(A9,LOW);
@@ -174,29 +195,102 @@ void resetSystem()
     Stats.REPORT_SENSORS_UNTOUCHED();
 }
 
-void triggerEnterExitLaneEvent()
+void resetMotors()
 {
-  event = is_inside_lane ? EVENT_ENTER_LANE : EVENT_EXIT_LANE;
+  Serial.println("In resetMotors().");
+  global_state.was_inside_lane = is_inside_lane;
+  turnOffMotors();
+  actuator.motorLoop();
+  if (global_state.delayed_report)
+  {
+    long int time_now = millis();
+    if (time_now >= global_state.delayed_report)
+    {
+        // TODO: Do it cleanly
+        turnOnMotor(13, 20);
+        global_state.delayed_report = 0;
+    }
+  }
+}
+
+void triggerResetSystemEvent()
+{
   #if DEBUG
-  Serial.println("Triggering ENTER OR EXIT LANE EVENT");
+  Serial.println("Triggering EVENT_RESET_SYSTEM");
   #endif
-  fsm.trigger(event);
+  fsm.trigger(EVENT_RESET_SYSTEM);
+}
+
+void triggerEnterLaneEvent()
+{
+  if (is_inside_lane) {
+    #if DEBUG
+    Serial.println("Triggering EVENT_ENTER_LANE");
+    #endif
+    fsm.trigger(EVENT_ENTER_LANE);
+  }
+}
+
+void triggerExitLaneEvent()
+{
+  if (!is_inside_lane) {
+    #if DEBUG
+    Serial.println("Triggering EVENT_EXIT_LANE");
+    #endif
+    fsm.trigger(EVENT_EXIT_LANE);
+  }
 }
 
 void triggerTurnOffPiezoEvent()
 {
   if (global_state.piezo_motor_entry != NULL) {
     #if DEBUG
-    Serial.println("Triggering TURN OFF PIEZO EVENT");
+    Serial.println("Triggering EVENT_TURN_OFF_PIEZO");
     #endif
     fsm.trigger(EVENT_TURN_OFF_PIEZO);
   }
 }
 
+void triggerOutsideLaneEvent()
+{
+  #if DEBUG
+  Serial.println("Triggering EVENT_OUTSIDE_LANE");
+  #endif
+  fsm.trigger(EVENT_OUTSIDE_LANE);
+}
+
+void triggerPullActuatorEvent()
+{
+  #if DEBUG
+  if (!motor_pushed)
+  #else
+  if (subject_location.block_detected && !motor_pushed)
+  #endif
+  {
+    #if DEBUG
+    Serial.println("Triggering EVENT_PULL_ACTUATOR");
+    #endif
+    fsm.trigger(EVENT_PULL_ACTUATOR);
+  }
+}
+
+void triggerResetMotorsEvent()
+{
+  #if DEBUG
+  Serial.println("Triggering EVENT_RESET_MOTORS");
+  #endif
+  fsm.trigger(EVENT_RESET_MOTORS);
+}
+
 void triggerNewEvents()
 {
-  triggerEnterExitLaneEvent();
+  triggerResetSystemEvent();
+  triggerEnterLaneEvent();
+  triggerExitLaneEvent();
   triggerTurnOffPiezoEvent();
+  triggerOutsideLaneEvent();
+  triggerPullActuatorEvent();
+  triggerResetMotorsEvent();
 }
 
 bool isInsideLane()
@@ -313,50 +407,50 @@ void resetSubjectLocation()
 
 bool isCorrectSensor()
 {
-    Lane lane = global_state.lanes[global_state.current_lane];
-    if (touched_sensor.left_sensor == true)
-    {
-      // Bug here: switch name
-      writeStats(Stats.LEFT_SENSOR_TOUCHED());
-      digitalWrite(Leds.SensorLeft, HIGH);
+  Lane lane = global_state.lanes[global_state.current_lane];
+  if (touched_sensor.left_sensor == true)
+  {
+    // Bug here: switch name
+    writeStats(Stats.LEFT_SENSOR_TOUCHED());
+    digitalWrite(Leds.SensorLeft, HIGH);
 
-      checkForceSensorMode(true);
+    checkForceSensorMode(true);
 
-      if (lane.reward_sensor == sensor.LEFT_ANALOUGE_PIN)
-      {
-          writeStats(Stats.CORRECT_SENSOR_TOUCHED());
-          return true;
-      }
-      else
-      {
-          writeStats(Stats.WRONG_SENSOR_TOUCHED());
-          return false;
-      }
-    }
-    else
+    if (lane.reward_sensor == sensor.LEFT_ANALOUGE_PIN)
     {
-      digitalWrite(Leds.SensorLeft, LOW);
-    }
-    if (touched_sensor.right_sensor == true)
-    {
-      // Bug here: switch name
-      writeStats(Stats.RIGHT_SENSOR_TOUCHED());
-      digitalWrite(Leds.SensorRight, HIGH);
-      checkForceSensorMode(false);
-      if (lane.reward_sensor == sensor.RIGHT_ANALOUGE_PIN)
-      {
         writeStats(Stats.CORRECT_SENSOR_TOUCHED());
         return true;
-      }
-      else
-      {
-        writeStats(Stats.WRONG_SENSOR_TOUCHED());
-        return false;
-      }
     }
     else
-      digitalWrite(Leds.SensorRight, LOW);
-    return false;
+    {
+        writeStats(Stats.WRONG_SENSOR_TOUCHED());
+        return false;
+    }
+  }
+  else
+  {
+    digitalWrite(Leds.SensorLeft, LOW);
+  }
+  if (touched_sensor.right_sensor == true)
+  {
+    // Bug here: switch name
+    writeStats(Stats.RIGHT_SENSOR_TOUCHED());
+    digitalWrite(Leds.SensorRight, HIGH);
+    checkForceSensorMode(false);
+    if (lane.reward_sensor == sensor.RIGHT_ANALOUGE_PIN)
+    {
+      writeStats(Stats.CORRECT_SENSOR_TOUCHED());
+      return true;
+    }
+    else
+    {
+      writeStats(Stats.WRONG_SENSOR_TOUCHED());
+      return false;
+    }
+  }
+  else
+    digitalWrite(Leds.SensorRight, LOW);
+  return false;
 }
 
 void checkForceSensorMode(bool is_left_sensor_touched)
@@ -1190,8 +1284,7 @@ void exitLane()
   Serial.println("In exitLane()");
   writeStats(Stats.EXITED_LANE(global_state.current_lane));
   #if DEBUG
-  MotorDurationEntry* temp = new MotorDurationEntry();
-  global_state.piezo_motor_entry = temp;
+  global_state.piezo_motor_entry = new MotorDurationEntry();
   #endif
 }
 
@@ -1219,6 +1312,7 @@ void outsideLaneFunc()
 
 void pullActuator()
 {
+  Serial.println("In pullActuator()");
   //digitalWrite(29,LOW); //########################################################################################
   actuator.setState(Actuator::PULL);
   if (global_state.last_reported_actuator_status != Actuator::PULL)
