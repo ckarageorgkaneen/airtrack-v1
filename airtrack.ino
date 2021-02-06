@@ -13,9 +13,9 @@
 #include "actuator.h"
 #include "reporter.h"
 
-#define DEBUG true
-#define DEBUG_W_TRIGGER_EVENT_MSGS DEBUG && false
-#define DEBUG_W_VIRTUAL_MOUSE DEBUG && DEBUG_W_TRIGGER_EVENT_MSGS && false
+#define DEBUG false
+#define ENABLE_TRIGGER_EVENT_MSGS DEBUG && false
+#define ENABLE_VIRTUAL_MOUSE DEBUG && ENABLE_TRIGGER_EVENT_MSGS && false
 #define AUTOMATED_REWARD true
 #define SINGLE_REWARD true
 #define FEEDBACK_AUTOMATED_REWARD false
@@ -226,7 +226,7 @@ void resetMotors()
 
 void triggerResetSystemEvent()
 {
-  #if DEBUG_W_TRIGGER_EVENT_MSGS
+  #if ENABLE_TRIGGER_EVENT_MSGS
   Serial.println("Triggering EVENT_RESET_SYSTEM");
   #endif
   fsm.trigger(EVENT_RESET_SYSTEM);
@@ -235,7 +235,7 @@ void triggerResetSystemEvent()
 void triggerEnterLaneEvent()
 {
   if (is_inside_lane) {
-    #if DEBUG_W_TRIGGER_EVENT_MSGS
+    #if ENABLE_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_ENTERED_LANE");
     #endif
     fsm.trigger(EVENT_ENTERED_LANE);
@@ -245,7 +245,7 @@ void triggerEnterLaneEvent()
 void triggerExitLaneEvent()
 {
   if (!is_inside_lane && global_state.was_inside_lane) {
-    #if DEBUG_W_TRIGGER_EVENT_MSGS
+    #if ENABLE_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_EXITED_LANE");
     #endif
     fsm.trigger(EVENT_EXITED_LANE);
@@ -255,7 +255,7 @@ void triggerExitLaneEvent()
 void triggerTurnOffPiezoEvent()
 {
   if (global_state.piezo_motor_entry != NULL) {
-    #if DEBUG_W_TRIGGER_EVENT_MSGS
+    #if ENABLE_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_TURN_OFF_PIEZO");
     #endif
     fsm.trigger(EVENT_TURN_OFF_PIEZO);
@@ -265,7 +265,7 @@ void triggerTurnOffPiezoEvent()
 void triggerOutsideLaneEvent()
 {
   if (!is_inside_lane) {
-    #if DEBUG_W_TRIGGER_EVENT_MSGS
+    #if ENABLE_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_OUTSIDE_LANE");
     #endif
     fsm.trigger(EVENT_OUTSIDE_LANE);
@@ -274,13 +274,13 @@ void triggerOutsideLaneEvent()
 
 void triggerPullActuatorEvent()
 {
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   if (!motor_pushed)
   #else
   if (subject_location.block_detected && !motor_pushed)
   #endif
   {
-    #if DEBUG_W_TRIGGER_EVENT_MSGS
+    #if ENABLE_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_PULL_ACTUATOR");
     #endif
     fsm.trigger(EVENT_PULL_ACTUATOR);
@@ -289,7 +289,7 @@ void triggerPullActuatorEvent()
 
 void triggerResetMotorsEvent()
 {
-  #if DEBUG_W_TRIGGER_EVENT_MSGS
+  #if ENABLE_TRIGGER_EVENT_MSGS
   Serial.println("Triggering EVENT_RESET_MOTORS");
   #endif
   fsm.trigger(EVENT_RESET_MOTORS);
@@ -325,7 +325,7 @@ bool isInsideLane()
 void resetIsInsideLaneFlags()
 {
   is_within_reward_lane_angle = isWithinRewardLaneAngle();
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   is_inside_lane = !global_state.was_inside_lane;
   #else
   is_inside_lane = isInsideLane();
@@ -1278,7 +1278,7 @@ void exitedLane()
   Serial.println("In exitedLane()");
   #endif
   writeStats(Stats.EXITED_LANE(global_state.current_lane));
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   global_state.piezo_motor_entry = new MotorDurationEntry();
   #endif
 }
@@ -1290,7 +1290,7 @@ void turnOffPiezo()
   #endif
   do
     digitalWrite(global_state.piezo_motor_entry->motor_id, LOW);
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   while (false);
   free(global_state.piezo_motor_entry);
   #else
