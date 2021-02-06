@@ -12,6 +12,9 @@
 #include "actuator.h"
 #include "reporter.h"
 
+#define DEBUG false
+#define ENABLE_VIRTUAL_MOUSE DEBUG && false
+
 const bool AUTOMATED_REWARD = true;
 const bool SINGLE_REWARD = true;
 const bool FEEDBACK_AUTOMATED_REWARD = false;
@@ -137,6 +140,9 @@ void loop ()
 {
 //Serial.println(global_state.reward_direction);
   //#######################################################################################Begin
+  #if DEBUG
+  Serial.println("In resetSystem().");
+  #endif
   if(digitalRead(25)==LOW)   //Enter Setup
   {
     Serial.println("Setup entered");
@@ -189,7 +195,11 @@ void loop ()
     }
 
     bool is_within_reward_lane_angle = isWithinRewardLaneAngle(subject_location);
+    #if ENABLE_VIRTUAL_MOUSE
+    bool is_inside_lane = !global_state.was_inside_lane;
+    #else
     bool is_inside_lane = isInsideLane(subject_location);
+    #endif
 
     move_training_servos(subject_location.angle, is_within_reward_lane_angle);
 
@@ -225,6 +235,9 @@ int factor = 100;
     // Serial.print("We are within reward lane");
     if (is_inside_lane)
     {
+        #if DEBUG
+        Serial.println("In enteredLane()");
+        #endif
         if (!global_state.was_inside_lane)
         {
             writeStats(Stats.ENTERED_LANE(global_state.current_lane));
@@ -311,27 +324,50 @@ int factor = 100;
     {
         if (global_state.was_inside_lane)
         {
+            #if DEBUG
+            Serial.println("In exitedLane()");
+            #endif
             writeStats(Stats.EXITED_LANE(global_state.current_lane));
-
+            #if ENABLE_VIRTUAL_MOUSE
+            global_state.peizo_motor_entry = new MotorDurationEntry();
+            #endif
             // Turn off peizo if it was on
             if (global_state.peizo_motor_entry != NULL)
             {
+                #if DEBUG
+                Serial.println("In turnOffPiezo()");
+                #endif
                 do
                 {
                     digitalWrite(global_state.peizo_motor_entry->motor_id, LOW);
                 }
+                #if ENABLE_VIRTUAL_MOUSE
+                while (false);
+                free(global_state.peizo_motor_entry);
+                #else
                 while (digitalRead(global_state.peizo_motor_entry->motor_id));
+                #endif
                 global_state.peizo_motor_entry->activated = false;
                 global_state.peizo_motor_entry = NULL;
             }
         }
 
+        #if DEBUG
+        Serial.println("In outsideLaneFunc()");
+        #endif
         global_state.was_inside_lane = false;
         global_state.reported_motor_max_distance = false;
     }
 
+    #if ENABLE_VIRTUAL_MOUSE
+    if (!motor_pushed)
+    #else
     if (subject_location.block_detected && !motor_pushed)
+    #endif
     {
+      #if DEBUG
+      Serial.println("In pullActuator()");
+       #endif
       //digitalWrite(29,LOW); //########################################################################################
 
         actuator.setState(Actuator::PULL);
@@ -358,6 +394,9 @@ int factor = 100;
         }
     }
 
+    #if DEBUG
+    Serial.println("In resetMotors().");
+    #endif
     global_state.was_inside_lane = is_inside_lane;
     turnOffMotor();
     actuator.motorLoop();
