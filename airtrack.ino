@@ -105,6 +105,11 @@ void setup()
     EVENT_EXIT_LANE,
     NULL);
   fsm.add_transition(
+    state.RESET_SYSTEM,
+    state.OUTSIDE_LANE,
+    EVENT_OUTSIDE_LANE,
+    NULL);
+  fsm.add_transition(
     state.EXIT_LANE,
     state.TURN_OFF_PIEZO,
     EVENT_TURN_OFF_PIEZO,
@@ -233,7 +238,7 @@ void triggerEnterLaneEvent()
 
 void triggerExitLaneEvent()
 {
-  if (!is_inside_lane) {
+  if (!is_inside_lane && global_state.was_inside_lane) {
     #if DEBUG
     Serial.println("Triggering EVENT_EXIT_LANE");
     #endif
@@ -253,10 +258,12 @@ void triggerTurnOffPiezoEvent()
 
 void triggerOutsideLaneEvent()
 {
-  #if DEBUG
-  Serial.println("Triggering EVENT_OUTSIDE_LANE");
-  #endif
-  fsm.trigger(EVENT_OUTSIDE_LANE);
+  if (!is_inside_lane) {
+    #if DEBUG
+    Serial.println("Triggering EVENT_OUTSIDE_LANE");
+    #endif
+    fsm.trigger(EVENT_OUTSIDE_LANE);
+  }
 }
 
 void triggerPullActuatorEvent()
