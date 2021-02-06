@@ -14,6 +14,7 @@
 #include "reporter.h"
 
 #define DEBUG false
+#define DEBUG_W_VIRTUAL_MOUSE DEBUG && false
 #define AUTOMATED_REWARD true
 #define SINGLE_REWARD true
 #define FEEDBACK_AUTOMATED_REWARD false
@@ -178,7 +179,9 @@ void initSystem()
 
 void resetSystem()
 {
+  #if DEBUG
   Serial.println("In resetSystem().");
+  #endif
   if(digitalRead(25) == LOW)
     resetActuator();
   digitalWrite(A9,LOW);
@@ -202,7 +205,9 @@ void resetSystem()
 
 void resetMotors()
 {
+  #if DEBUG
   Serial.println("In resetMotors().");
+  #endif
   global_state.was_inside_lane = is_inside_lane;
   turnOffMotors();
   actuator.motorLoop();
@@ -268,7 +273,7 @@ void triggerOutsideLaneEvent()
 
 void triggerPullActuatorEvent()
 {
-  #if DEBUG
+  #if DEBUG_W_VIRTUAL_MOUSE
   if (!motor_pushed)
   #else
   if (subject_location.block_detected && !motor_pushed)
@@ -319,7 +324,7 @@ bool isInsideLane()
 void resetIsInsideLaneFlags()
 {
   is_within_reward_lane_angle = isWithinRewardLaneAngle();
-  #if DEBUG
+  #if DEBUG_W_VIRTUAL_MOUSE
   is_inside_lane = !global_state.was_inside_lane;
   #else
   is_inside_lane = isInsideLane();
@@ -1207,7 +1212,9 @@ void turnOffMotors()
 
 void enterLane()
 {
+  #if DEBUG
   Serial.println("In enterLane()");
+  #endif
   if (!global_state.was_inside_lane)
     writeStats(Stats.ENTERED_LANE(global_state.current_lane));
   global_state.was_inside_lane = true;
@@ -1266,19 +1273,23 @@ void enterLane()
 
 void exitLane()
 {
-  Serial.println("In exitLane()");
-  writeStats(Stats.EXITED_LANE(global_state.current_lane));
   #if DEBUG
+  Serial.println("In exitLane()");
+  #endif
+  writeStats(Stats.EXITED_LANE(global_state.current_lane));
+  #if DEBUG_W_VIRTUAL_MOUSE
   global_state.piezo_motor_entry = new MotorDurationEntry();
   #endif
 }
 
 void turnOffPiezo()
 {
+  #if DEBUG
   Serial.println("In turnOffPiezo()");
+  #endif
   do
     digitalWrite(global_state.piezo_motor_entry->motor_id, LOW);
-  #if DEBUG
+  #if DEBUG_W_VIRTUAL_MOUSE
   while (false);
   free(global_state.piezo_motor_entry);
   #else
@@ -1290,14 +1301,18 @@ void turnOffPiezo()
 
 void outsideLaneFunc()
 {
+  #if DEBUG
   Serial.println("In outsideLaneFunc()");
+  #endif
   global_state.was_inside_lane = false;
   global_state.reported_motor_max_distance = false;
 }
 
 void pullActuator()
 {
+  #if DEBUG
   Serial.println("In pullActuator()");
+  #endif
   //digitalWrite(29,LOW); //########################################################################################
   actuator.setState(Actuator::PULL);
   if (global_state.last_reported_actuator_status != Actuator::PULL)
