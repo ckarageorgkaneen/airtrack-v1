@@ -47,8 +47,8 @@ SubjectLocation subject_location;
 
 void initSystem();
 void makeNewRewardLane();
-void enterLane();
-void exitLane();
+void enteredLane();
+void exitedLane();
 void turnOffPiezo();
 void outsideLaneFunc();
 void resetSystem();
@@ -59,8 +59,8 @@ struct StateStruct
 {
   State* INITIALIZE = new State(initSystem, NULL, NULL);
   State* RESET_SYSTEM = new State(resetSystem, NULL, NULL);
-  State* INSIDE_LANE = new State(enterLane, NULL, NULL);
-  State* EXITED_LANE = new State(exitLane, NULL, NULL);
+  State* INSIDE_LANE = new State(enteredLane, NULL, NULL);
+  State* EXITED_LANE = new State(exitedLane, NULL, NULL);
   State* TURN_OFF_PIEZO = new State(turnOffPiezo, NULL, NULL);
   State* OUTSIDE_LANE = new State(outsideLaneFunc, NULL, NULL);
   State* PULL_ACTUATOR = new State(pullActuator, NULL, NULL);
@@ -1210,10 +1210,10 @@ void turnOffMotors()
   }
 }
 
-void enterLane()
+void enteredLane()
 {
   #if DEBUG
-  Serial.println("In enterLane()");
+  Serial.println("In enteredLane()");
   #endif
   if (!global_state.was_inside_lane)
     writeStats(Stats.ENTERED_LANE(global_state.current_lane));
@@ -1271,10 +1271,10 @@ void enterLane()
   }
 }
 
-void exitLane()
+void exitedLane()
 {
   #if DEBUG
-  Serial.println("In exitLane()");
+  Serial.println("In exitedLane()");
   #endif
   writeStats(Stats.EXITED_LANE(global_state.current_lane));
   #if DEBUG_W_VIRTUAL_MOUSE
