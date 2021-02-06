@@ -1264,28 +1264,6 @@ void enterLane()
   }
 }
 
-void OLD_exitLane()
-{
-  Serial.println("In exitLane()");
-  if (global_state.was_inside_lane)
-  {
-    writeStats(Stats.EXITED_LANE(global_state.current_lane));
-    // Turn off piezo if it was on
-    if (global_state.piezo_motor_entry != NULL)
-    {
-      do
-      {
-        digitalWrite(global_state.piezo_motor_entry->motor_id, LOW);
-      }
-      while (digitalRead(global_state.piezo_motor_entry->motor_id));
-      global_state.piezo_motor_entry->activated = false;
-      global_state.piezo_motor_entry = NULL;
-    }
-  }
-  global_state.was_inside_lane = false;
-  global_state.reported_motor_max_distance = false;
-}
-
 void exitLane()
 {
   Serial.println("In exitLane()");
