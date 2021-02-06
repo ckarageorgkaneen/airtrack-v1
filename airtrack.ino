@@ -59,7 +59,7 @@ struct StateStruct
   State* INITIALIZE = new State(initSystem, NULL, NULL);
   State* RESET_SYSTEM = new State(resetSystem, NULL, NULL);
   State* INSIDE_LANE = new State(enterLane, NULL, NULL);
-  State* EXIT_LANE = new State(exitLane, NULL, NULL);
+  State* EXITED_LANE = new State(exitLane, NULL, NULL);
   State* TURN_OFF_PIEZO = new State(turnOffPiezo, NULL, NULL);
   State* OUTSIDE_LANE = new State(outsideLaneFunc, NULL, NULL);
   State* PULL_ACTUATOR = new State(pullActuator, NULL, NULL);
@@ -69,8 +69,8 @@ struct StateStruct
 enum EventEnum
 {
   EVENT_RESET_SYSTEM,
-  EVENT_ENTER_LANE,
-  EVENT_EXIT_LANE,
+  EVENT_ENTERED_LANE,
+  EVENT_EXITED_LANE,
   EVENT_TURN_OFF_PIEZO,
   EVENT_OUTSIDE_LANE,
   EVENT_PULL_ACTUATOR,
@@ -92,7 +92,7 @@ void setup()
   fsm.add_transition(
     state.RESET_SYSTEM,
     state.INSIDE_LANE,
-    EVENT_ENTER_LANE,
+    EVENT_ENTERED_LANE,
     NULL);
   fsm.add_transition(
     state.INSIDE_LANE,
@@ -101,8 +101,8 @@ void setup()
     NULL);
   fsm.add_transition(
     state.RESET_SYSTEM,
-    state.EXIT_LANE,
-    EVENT_EXIT_LANE,
+    state.EXITED_LANE,
+    EVENT_EXITED_LANE,
     NULL);
   fsm.add_transition(
     state.RESET_SYSTEM,
@@ -110,7 +110,7 @@ void setup()
     EVENT_OUTSIDE_LANE,
     NULL);
   fsm.add_transition(
-    state.EXIT_LANE,
+    state.EXITED_LANE,
     state.TURN_OFF_PIEZO,
     EVENT_TURN_OFF_PIEZO,
     NULL);
@@ -120,7 +120,7 @@ void setup()
     EVENT_PULL_ACTUATOR,
     NULL);
   fsm.add_transition(
-    state.EXIT_LANE,
+    state.EXITED_LANE,
     state.OUTSIDE_LANE,
     EVENT_OUTSIDE_LANE,
     NULL);
@@ -230,9 +230,9 @@ void triggerEnterLaneEvent()
 {
   if (is_inside_lane) {
     #if DEBUG
-    Serial.println("Triggering EVENT_ENTER_LANE");
+    Serial.println("Triggering EVENT_ENTERED_LANE");
     #endif
-    fsm.trigger(EVENT_ENTER_LANE);
+    fsm.trigger(EVENT_ENTERED_LANE);
   }
 }
 
@@ -240,9 +240,9 @@ void triggerExitLaneEvent()
 {
   if (!is_inside_lane && global_state.was_inside_lane) {
     #if DEBUG
-    Serial.println("Triggering EVENT_EXIT_LANE");
+    Serial.println("Triggering EVENT_EXITED_LANE");
     #endif
-    fsm.trigger(EVENT_EXIT_LANE);
+    fsm.trigger(EVENT_EXITED_LANE);
   }
 }
 
