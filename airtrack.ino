@@ -1308,20 +1308,14 @@ void pullActuator()
     writeStats(Stats.MOTOR_PULLED());
     global_state.last_reported_actuator_status = Actuator::PULL;
   }
-
-  if (global_state.actuator_at_min_pull)
-  {
-    if (!global_state.reported_motor_min_distance)
-    {
-      writeStats(Stats.MOTOR_MIN_RANGE());
-      global_state.reported_motor_min_distance = true;
-      // TODO: Do it cleanly
-      turnOnMotor(13, 20);
-      //digitalWrite(45, HIGH);
-    }
+  bool motor_min_range_condition = global_state.actuator_at_min_pull && !global_state.reported_motor_min_distance;
+  if (motor_min_range_condition) {
+    writeStats(Stats.MOTOR_MIN_RANGE());
+    // TODO: Do it cleanly
+    turnOnMotor(13, 20);
+    //digitalWrite(45, HIGH);
   }
-  else
-    global_state.reported_motor_min_distance = false;
+  global_state.reported_motor_min_distance = motor_min_range_condition;
 }
 
 
