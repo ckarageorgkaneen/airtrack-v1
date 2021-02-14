@@ -74,7 +74,6 @@ enum EventEnum
   EVENT_ENTERED_LANE,
   EVENT_EXITED_LANE,
   EVENT_TURN_OFF_PIEZO,
-  EVENT_OUTSIDE_LANE,
   EVENT_PULL_ACTUATOR,
   EVENT_RESET_MOTORS,
 };
@@ -106,10 +105,10 @@ void setup()
     state.EXITED_LANE,
     EVENT_EXITED_LANE,
     NULL);
-  fsm.add_transition(
+  fsm.add_timed_transition(
     state.RESET_SYSTEM,
     state.OUTSIDE_LANE,
-    EVENT_OUTSIDE_LANE,
+    NO_DELAY,
     NULL);
   fsm.add_transition(
     state.EXITED_LANE,
@@ -121,43 +120,42 @@ void setup()
     state.PULL_ACTUATOR,
     EVENT_PULL_ACTUATOR,
     NULL);
-  fsm.add_transition(
+  fsm.add_timed_transition(
     state.EXITED_LANE,
     state.OUTSIDE_LANE,
-    EVENT_OUTSIDE_LANE,
+    NO_DELAY,
     NULL);
-  fsm.add_transition(
+  fsm.add_timed_transition(
     state.TURN_OFF_PIEZO,
     state.OUTSIDE_LANE,
-    EVENT_OUTSIDE_LANE,
+    NO_DELAY,
     NULL);
   fsm.add_transition(
     state.OUTSIDE_LANE,
     state.RESET_MOTORS,
     EVENT_RESET_MOTORS,
     NULL);
-  fsm.add_transition(
+  fsm.add_timed_transition(
     state.INSIDE_LANE,
     state.RESET_MOTORS,
-    EVENT_RESET_MOTORS,
+    NO_DELAY,
     NULL);
-  fsm.add_transition(
+  fsm.add_timed_transition(
     state.PULL_ACTUATOR,
     state.RESET_MOTORS,
-    EVENT_RESET_MOTORS,
+    NO_DELAY,
     NULL);
   fsm.add_transition(
     state.RESET_MOTORS,
     state.RESET_SYSTEM,
     EVENT_RESET_SYSTEM,
     NULL);
-  fsm.run_machine();
 }
 
 void loop()
 {
-  triggerNewEvents();
   fsm.run_machine();
+  triggerNewEvents();
 }
 
 void initSystem()
@@ -262,16 +260,6 @@ void triggerTurnOffPiezoEvent()
   }
 }
 
-void triggerOutsideLaneEvent()
-{
-  if (!is_inside_lane) {
-    #if ENABLE_TRIGGER_EVENT_MSGS
-    Serial.println("Triggering EVENT_OUTSIDE_LANE");
-    #endif
-    fsm.trigger(EVENT_OUTSIDE_LANE);
-  }
-}
-
 void triggerPullActuatorEvent()
 {
   #if ENABLE_VIRTUAL_MOUSE
@@ -301,7 +289,6 @@ void triggerNewEvents()
   triggerEnterLaneEvent();
   triggerExitLaneEvent();
   triggerTurnOffPiezoEvent();
-  triggerOutsideLaneEvent();
   triggerPullActuatorEvent();
   triggerResetMotorsEvent();
 }
