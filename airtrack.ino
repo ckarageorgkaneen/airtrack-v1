@@ -1217,8 +1217,8 @@ void beInsideLane()
     {
       if (!global_state.reported_motor_max_distance)
       {
-          writeStats(Stats.MOTOR_MAX_RANGE());
-          global_state.reported_motor_max_distance = true;
+        writeStats(Stats.MOTOR_MAX_RANGE());
+        global_state.reported_motor_max_distance = true;
       }
       // Allow a bit of buffer time for sensor vibration to
       // rest before reading
@@ -1226,31 +1226,31 @@ void beInsideLane()
       bool max_push_wait_exceeded = global_state.max_push_current_duration <= time_now - global_state.MAX_PUSH_WAIT;
       if (max_push_wait_exceeded)
       {
-          if (!global_state.reported_motor_max_wait)
-          {
-              Serial.print("max_push_current_duration: ");
-              Serial.print(global_state.max_push_current_duration);
-              Serial.print(" - MAX_PUSH_WAIT: ");
-              Serial.print(global_state.MAX_PUSH_WAIT);
-              Serial.print("- time_now: ");
-              Serial.println(time_now);
-              writeStats(Stats.MOTOR_WAIT_DONE());
-              global_state.reported_motor_max_wait = true;
-          }
-          // Call isCorrectSensor() anyway so it'd call
-          // writeStats() on the touched sensor
-          // is_correct_sensor = isCorrectSensor(touched_sensor);
-          // if (touched_sensor.change_happened &&
-          //     !global_state.sensor_was_touched)
-          // {
-          //     global_state.sensor_was_touched = true;
-          //     if (is_correct_sensor)
-          //         global_state.miss_or_wrong_touch_count = 0;
-          //     else
-          //         global_state.miss_or_wrong_touch_count += 1;
-          // }
-          if (global_state.is_automated_reward || touched_sensor.change_happened)
-            checkGiveReward(is_correct_sensor, global_state.is_automated_reward);
+        if (!global_state.reported_motor_max_wait)
+        {
+          Serial.print("max_push_current_duration: ");
+          Serial.print(global_state.max_push_current_duration);
+          Serial.print(" - MAX_PUSH_WAIT: ");
+          Serial.print(global_state.MAX_PUSH_WAIT);
+          Serial.print("- time_now: ");
+          Serial.println(time_now);
+          writeStats(Stats.MOTOR_WAIT_DONE());
+          global_state.reported_motor_max_wait = true;
+        }
+        // Call isCorrectSensor() anyway so it'd call
+        // writeStats() on the touched sensor
+        // is_correct_sensor = isCorrectSensor(touched_sensor);
+        // if (touched_sensor.change_happened &&
+        //     !global_state.sensor_was_touched)
+        // {
+        //     global_state.sensor_was_touched = true;
+        //     if (is_correct_sensor)
+        //         global_state.miss_or_wrong_touch_count = 0;
+        //     else
+        //         global_state.miss_or_wrong_touch_count += 1;
+        // }
+        if (global_state.is_automated_reward || touched_sensor.change_happened)
+          checkGiveReward(is_correct_sensor, global_state.is_automated_reward);
       }
     }
   }
