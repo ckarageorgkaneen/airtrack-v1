@@ -210,15 +210,12 @@ void resetMotors()
   global_state.was_inside_lane = is_inside_lane;
   turnOffMotors();
   actuator.motorLoop();
-  if (global_state.delayed_report)
+  long int time_now = millis();
+  if (global_state.delayed_report && (time_now >= global_state.delayed_report))
   {
-    long int time_now = millis();
-    if (time_now >= global_state.delayed_report)
-    {
-        // TODO: Do it cleanly
-        turnOnMotor(13, 20);
-        global_state.delayed_report = 0;
-    }
+    // TODO: Do it cleanly
+    turnOnMotor(13, 20);
+    global_state.delayed_report = 0;
   }
 }
 
