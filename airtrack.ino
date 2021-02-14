@@ -202,6 +202,12 @@ void resetSystem()
     Stats.REPORT_SENSORS_UNTOUCHED();
 }
 
+void turnOnActuator()
+{
+  // TODO: Do it cleanly
+  turnOnMotor(13, 20);
+}
+
 void resetMotors()
 {
   #if DEBUG
@@ -213,8 +219,7 @@ void resetMotors()
   long int time_now = millis();
   if (global_state.delayed_report && (time_now >= global_state.delayed_report))
   {
-    // TODO: Do it cleanly
-    turnOnMotor(13, 20);
+    turnOnActuator();
     global_state.delayed_report = 0;
   }
 }
@@ -1308,8 +1313,7 @@ void pullActuator()
   bool motor_min_range_condition = global_state.actuator_at_min_pull && !global_state.reported_motor_min_distance;
   if (motor_min_range_condition) {
     writeStats(Stats.MOTOR_MIN_RANGE());
-    // TODO: Do it cleanly
-    turnOnMotor(13, 20);
+    turnOnActuator();
     //digitalWrite(45, HIGH);
   }
   global_state.reported_motor_min_distance = motor_min_range_condition;
