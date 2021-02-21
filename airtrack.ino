@@ -68,10 +68,10 @@ struct StateStruct
 {
   State* INITIALIZE = new State(initSystem, NULL, NULL);
   State* RESET_SYSTEM = new State(resetSystem, NULL, NULL);
-  State* EXITED_LANE = new State(exitLane, NULL, NULL);
+  State* EXIT_LANE = new State(exitLane, NULL, NULL);
   State* TURN_OFF_PIEZO = new State(turnOffPiezo, NULL, NULL);
   State* OUTSIDE_LANE = new State(beOutsideLane, NULL, NULL);
-  State* ENTERED_LANE = new State(enterLane, NULL, NULL);
+  State* ENTER_LANE = new State(enterLane, NULL, NULL);
   State* PUSH_ACTUATOR = new State(pushActuator, NULL, NULL);
   State* ACTUATOR_AT_MAX_PUSH = new State(reportActuatorAtMaxPush, NULL, NULL);
   State* ACTUATOR_AT_REST = new State(reportActuatorAtRest, NULL, NULL);
@@ -86,9 +86,9 @@ struct StateStruct
 enum EventEnum
 {
   EVENT_RESET_SYSTEM,
-  EVENT_EXITED_LANE,
+  EVENT_EXIT_LANE,
   EVENT_TURN_OFF_PIEZO,
-  EVENT_ENTERED_LANE,
+  EVENT_ENTER_LANE,
   EVENT_PUSH_ACTUATOR,
   EVENT_ACTUATOR_AT_MAX_PUSH,
   EVENT_ACTUATOR_AT_REST,
@@ -118,11 +118,11 @@ void setup()
     NULL);
   fsm.add_transition(
     state.RESET_SYSTEM,
-    state.EXITED_LANE,
-    EVENT_EXITED_LANE,
+    state.EXIT_LANE,
+    EVENT_EXIT_LANE,
     NULL);
   fsm.add_transition(
-    state.EXITED_LANE,
+    state.EXIT_LANE,
     state.TURN_OFF_PIEZO,
     EVENT_TURN_OFF_PIEZO,
     NULL);
@@ -132,7 +132,7 @@ void setup()
     EVENT_PULL_ACTUATOR,
     NULL);
   fsm.add_timed_transition(
-    state.EXITED_LANE,
+    state.EXIT_LANE,
     state.OUTSIDE_LANE,
     NO_DELAY,
     NULL);
@@ -148,16 +148,16 @@ void setup()
     NULL);
   fsm.add_transition(
     state.RESET_SYSTEM,
-    state.ENTERED_LANE,
-    EVENT_ENTERED_LANE,
+    state.ENTER_LANE,
+    EVENT_ENTER_LANE,
     NULL);
   fsm.add_timed_transition(
-    state.ENTERED_LANE,
+    state.ENTER_LANE,
     state.INSIDE_LANE,
     NO_DELAY,
     NULL);
   fsm.add_transition(
-    state.ENTERED_LANE,
+    state.ENTER_LANE,
     state.PUSH_ACTUATOR,
     EVENT_PUSH_ACTUATOR,
     NULL);
@@ -327,9 +327,9 @@ void triggerEnterLaneEvent()
 {
   if (is_inside_lane) {
     #if ENABLE_TRIGGER_EVENT_MSGS
-    Serial.println("Triggering EVENT_ENTERED_LANE");
+    Serial.println("Triggering EVENT_ENTER_LANE");
     #endif
-    fsm.trigger(EVENT_ENTERED_LANE);
+    fsm.trigger(EVENT_ENTER_LANE);
   }
 }
 
@@ -424,9 +424,9 @@ void triggerExitLaneEvent()
 {
   if (!is_inside_lane && global_state.was_inside_lane) {
     #if ENABLE_TRIGGER_EVENT_MSGS
-    Serial.println("Triggering EVENT_EXITED_LANE");
+    Serial.println("Triggering EVENT_EXIT_LANE");
     #endif
-    fsm.trigger(EVENT_EXITED_LANE);
+    fsm.trigger(EVENT_EXIT_LANE);
   }
 }
 
