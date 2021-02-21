@@ -432,7 +432,12 @@ void triggerExitLaneEvent()
 
 void triggerTurnOffPiezoEvent()
 {
-  if (global_state.piezo_motor_entry != NULL) {
+  #if ENABLE_VIRTUAL_MOUSE
+  bool turn_off_piezo_condition = true;
+  #else
+  bool turn_off_piezo_condition = global_state.piezo_motor_entry != NULL;
+  #endif
+  if (turn_off_piezo_condition) {
     #if ENABLE_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_TURN_OFF_PIEZO");
     #endif
@@ -1476,9 +1481,6 @@ void reportExitedLane()
   Serial.println("In reportExitedLane()");
   #endif
   writeStats(Stats.EXITED_LANE(global_state.current_lane));
-  #if ENABLE_VIRTUAL_MOUSE
-  global_state.piezo_motor_entry = new MotorDurationEntry();
-  #endif
 }
 
 void turnOffPiezo()
@@ -1490,7 +1492,6 @@ void turnOffPiezo()
     digitalWrite(global_state.piezo_motor_entry->motor_id, LOW);
   #if ENABLE_VIRTUAL_MOUSE
   while (false);
-  free(global_state.piezo_motor_entry);
   #else
   while (digitalRead(global_state.piezo_motor_entry->motor_id));
   #endif
