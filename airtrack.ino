@@ -50,7 +50,7 @@ SubjectLocation subject_location;
 void initSystem();
 void makeNewRewardLane();
 void resetSystem();
-void exitLane();
+void reportExitedLane();
 void turnOffPiezo();
 void beOutsideLane();
 void enterLane();
@@ -68,7 +68,7 @@ struct StateStruct
 {
   State* INITIALIZE = new State(initSystem, NULL, NULL);
   State* RESET_SYSTEM = new State(resetSystem, NULL, NULL);
-  State* EXIT_LANE = new State(exitLane, NULL, NULL);
+  State* EXIT_LANE = new State(reportExitedLane, NULL, NULL);
   State* TURN_OFF_PIEZO = new State(turnOffPiezo, NULL, NULL);
   State* OUTSIDE_LANE = new State(beOutsideLane, NULL, NULL);
   State* ENTER_LANE = new State(enterLane, NULL, NULL);
@@ -1470,10 +1470,10 @@ void beInsideLane(){
   #endif
 }
 
-void exitLane()
+void reportExitedLane()
 {
   #if DEBUG
-  Serial.println("In exitLane()");
+  Serial.println("In reportExitedLane()");
   #endif
   writeStats(Stats.EXITED_LANE(global_state.current_lane));
   #if ENABLE_VIRTUAL_MOUSE
