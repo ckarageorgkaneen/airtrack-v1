@@ -14,8 +14,9 @@
 #include "reporter.h"
 
 #define DEBUG false
-#define ENABLE_TRIGGER_EVENT_MSGS DEBUG && false
-#define ENABLE_VIRTUAL_MOUSE DEBUG && ENABLE_TRIGGER_EVENT_MSGS && false
+#define DEBUG_STATE_FUNCTIONS DEBUG || false
+#define DEBUG_TRIGGER_EVENT_MSGS DEBUG || false
+#define DEBUG_W_VIRTUAL_MOUSE DEBUG || false
 #define AUTOMATED_REWARD true
 #define SINGLE_REWARD true
 #define FEEDBACK_AUTOMATED_REWARD false
@@ -270,7 +271,7 @@ void initSystem()
 
 void resetSystem()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In resetSystem().");
   #endif
   if(digitalRead(25) == LOW)
@@ -302,7 +303,7 @@ void turnOnActuator()
 
 void resetMotors()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In resetMotors().");
   #endif
   global_state.was_inside_lane = is_inside_lane;
@@ -318,7 +319,7 @@ void resetMotors()
 
 void triggerResetSystemEvent()
 {
-  #if ENABLE_TRIGGER_EVENT_MSGS
+  #if DEBUG_TRIGGER_EVENT_MSGS
   Serial.println("Triggering EVENT_RESET_SYSTEM");
   #endif
   fsm.trigger(EVENT_RESET_SYSTEM);
@@ -327,7 +328,7 @@ void triggerResetSystemEvent()
 void triggerEnterLaneEvent()
 {
   if (is_inside_lane) {
-    #if ENABLE_TRIGGER_EVENT_MSGS
+    #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_ENTER_LANE");
     #endif
     fsm.trigger(EVENT_ENTER_LANE);
@@ -336,13 +337,13 @@ void triggerEnterLaneEvent()
 
 void triggerPushActuatorEvent()
 {
-  #if ENABLE_VIRTUAL_MOUSE
+  #if DEBUG_W_VIRTUAL_MOUSE
   bool push_actuator_condition = true;
   #else
   bool push_actuator_condition = is_within_reward_lane_angle && shouldTriggerMotor();
   #endif
   if (push_actuator_condition) {
-    #if ENABLE_TRIGGER_EVENT_MSGS
+    #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_PUSH_ACTUATOR");
     #endif
     fsm.trigger(EVENT_PUSH_ACTUATOR);
@@ -351,13 +352,13 @@ void triggerPushActuatorEvent()
 
 void triggerActuatorAtMaxPushEvent()
 {
-  #if ENABLE_VIRTUAL_MOUSE
+  #if DEBUG_W_VIRTUAL_MOUSE
   bool actuator_is_at_max_push = true;
   #else
   bool actuator_is_at_max_push = global_state.actuator_at_max_push;
   #endif
   if (actuator_is_at_max_push) {
-    #if ENABLE_TRIGGER_EVENT_MSGS
+    #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_ACTUATOR_AT_MAX_PUSH");
     #endif
     fsm.trigger(EVENT_ACTUATOR_AT_MAX_PUSH);
@@ -369,14 +370,14 @@ void triggerActuatorAtRestEvent()
   // Allow a bit of buffer time for sensor vibration to
   // rest before reading
   long int time_now = millis();
-  #if ENABLE_VIRTUAL_MOUSE
+  #if DEBUG_W_VIRTUAL_MOUSE
   bool max_push_wait_exceeded = true;
   #else
   bool max_push_wait_exceeded = global_state.max_push_current_duration <= time_now - global_state.MAX_PUSH_WAIT;
   #endif
   if (max_push_wait_exceeded) {
     actuator_at_rest_time_now = time_now;
-    #if ENABLE_TRIGGER_EVENT_MSGS
+    #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_ACTUATOR_AT_REST");
     #endif
     fsm.trigger(EVENT_ACTUATOR_AT_REST);
@@ -385,7 +386,7 @@ void triggerActuatorAtRestEvent()
 
 void triggerResetIsCorrectSensor()
 {
-  #if ENABLE_TRIGGER_EVENT_MSGS
+  #if DEBUG_TRIGGER_EVENT_MSGS
   Serial.println("Triggering EVENT_RESET_IS_CORRECT_SENSOR");
   #endif
   fsm.trigger(EVENT_RESET_IS_CORRECT_SENSOR);
@@ -393,13 +394,13 @@ void triggerResetIsCorrectSensor()
 
 void triggerSensorTouchedEvent()
 {
-  // #if ENABLE_TRIGGER_EVENT_MSGS
+  // #if DEBUG_TRIGGER_EVENT_MSGS
   // bool sensor_was_touched = true;
   // #else
   // bool sensor_was_touched = touched_sensor.change_happened && !global_state.sensor_was_touched;
   // #endif
   // if (sensor_was_touched) {
-  //   #if ENABLE_TRIGGER_EVENT_MSGS
+  //   #if DEBUG_TRIGGER_EVENT_MSGS
   //   Serial.println("Triggering EVENT_SENSOR_TOUCHED");
   //   #endif
   //   fsm.trigger(EVENT_SENSOR_TOUCHED);
@@ -408,13 +409,13 @@ void triggerSensorTouchedEvent()
 
 void triggerCheckGiveRewardEvent()
 {
-  #if ENABLE_TRIGGER_EVENT_MSGS
+  #if DEBUG_TRIGGER_EVENT_MSGS
   bool check_give_reward_condition = true;
   #else
   bool check_give_reward_condition = global_state.is_automated_reward || touched_sensor.change_happened;
   #endif
   if (check_give_reward_condition) {
-    #if ENABLE_TRIGGER_EVENT_MSGS
+    #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_CHECK_GIVE_REWARD");
     #endif
     fsm.trigger(EVENT_CHECK_GIVE_REWARD);
@@ -424,12 +425,12 @@ void triggerCheckGiveRewardEvent()
 void triggerOutsideLaneEvents()
 {
   if (!is_inside_lane && global_state.was_inside_lane) {
-    #if ENABLE_TRIGGER_EVENT_MSGS
+    #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_EXIT_LANE");
     #endif
     fsm.trigger(EVENT_EXIT_LANE);
   } else if (!is_inside_lane) {
-    #if ENABLE_TRIGGER_EVENT_MSGS
+    #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_BE_OUTSIDE_LANE");
     #endif
     fsm.trigger(EVENT_BE_OUTSIDE_LANE);
@@ -438,13 +439,13 @@ void triggerOutsideLaneEvents()
 
 void triggerTurnOffPiezoEvent()
 {
-  #if ENABLE_VIRTUAL_MOUSE
+  #if DEBUG_W_VIRTUAL_MOUSE
   bool turn_off_piezo_condition = true;
   #else
   bool turn_off_piezo_condition = global_state.piezo_motor_entry != NULL;
   #endif
   if (turn_off_piezo_condition) {
-    #if ENABLE_TRIGGER_EVENT_MSGS
+    #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_TURN_OFF_PIEZO");
     #endif
     fsm.trigger(EVENT_TURN_OFF_PIEZO);
@@ -453,14 +454,14 @@ void triggerTurnOffPiezoEvent()
 
 void triggerPullActuatorEvent()
 {
-  #if ENABLE_VIRTUAL_MOUSE
+  #if DEBUG_W_VIRTUAL_MOUSE
   bool pull_actuator_condition = true;
   #else
   bool pull_actuator_condition = subject_location.block_detected && !motor_pushed;
   #endif
   if (pull_actuator_condition)
   {
-    #if ENABLE_TRIGGER_EVENT_MSGS
+    #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_PULL_ACTUATOR");
     #endif
     fsm.trigger(EVENT_PULL_ACTUATOR);
@@ -469,7 +470,7 @@ void triggerPullActuatorEvent()
 
 void triggerResetMotorsEvent()
 {
-  #if ENABLE_TRIGGER_EVENT_MSGS
+  #if DEBUG_TRIGGER_EVENT_MSGS
   Serial.println("Triggering EVENT_RESET_MOTORS");
   #endif
   fsm.trigger(EVENT_RESET_MOTORS);
@@ -510,7 +511,7 @@ bool isInsideLane()
 void resetIsInsideLaneFlags()
 {
   is_within_reward_lane_angle = isWithinRewardLaneAngle();
-  #if ENABLE_VIRTUAL_MOUSE
+  #if DEBUG_W_VIRTUAL_MOUSE
   is_inside_lane = !global_state.was_inside_lane;
   #else
   is_inside_lane = isInsideLane();
@@ -709,7 +710,7 @@ void checkForceSensorMode(bool is_left_sensor_touched)
 
 void resetIsCorrectSensor()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In resetIsCorrectSensor()");
   #endif
   // Call isCorrectSensor() anyway so it'd call
@@ -719,7 +720,7 @@ void resetIsCorrectSensor()
 
 void checkGiveReward()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In checkGiveReward()");
   #endif
   if (global_state.reward_given)
@@ -1411,7 +1412,7 @@ void turnOffMotors()
 
 void enterLane()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In enterLane()");
   #endif
   if (!global_state.was_inside_lane)
@@ -1421,7 +1422,7 @@ void enterLane()
 
 void pushActuator()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In pushActuator()");
   #endif
   actuator.setState(Actuator::PUSH);
@@ -1436,7 +1437,7 @@ void pushActuator()
 
 void reportActuatorAtMaxPush()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In reportActuatorAtMaxPush()");
   #endif
   if (!global_state.reported_motor_max_distance)
@@ -1448,7 +1449,7 @@ void reportActuatorAtMaxPush()
 
 void reportActuatorAtRest()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In reportActuatorAtRest()");
   #endif
   if (!global_state.reported_motor_max_wait)
@@ -1466,7 +1467,7 @@ void reportActuatorAtRest()
 
 void reportSensorTouched()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In reportSensorTouched()");
   #endif
   // global_state.sensor_was_touched = true;
@@ -1477,14 +1478,14 @@ void reportSensorTouched()
 }
 
 void beInsideLane(){
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In beInsideLane()");
   #endif
 }
 
 void reportExitedLane()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In reportExitedLane()");
   #endif
   writeStats(Stats.EXITED_LANE(global_state.current_lane));
@@ -1492,12 +1493,12 @@ void reportExitedLane()
 
 void turnOffPiezo()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In turnOffPiezo()");
   #endif
   do
     digitalWrite(global_state.piezo_motor_entry->motor_id, LOW);
-  #if ENABLE_VIRTUAL_MOUSE
+  #if DEBUG_W_VIRTUAL_MOUSE
   while (false);
   #else
   while (digitalRead(global_state.piezo_motor_entry->motor_id));
@@ -1508,7 +1509,7 @@ void turnOffPiezo()
 
 void beOutsideLane()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In beOutsideLane()");
   #endif
   global_state.was_inside_lane = false;
@@ -1517,7 +1518,7 @@ void beOutsideLane()
 
 void pullActuator()
 {
-  #if DEBUG
+  #if DEBUG_STATE_FUNCTIONS
   Serial.println("In pullActuator()");
   #endif
   //digitalWrite(29,LOW); //########################################################################################
