@@ -43,16 +43,24 @@ bool is_within_reward_lane_angle = false;
 bool is_inside_lane = false;
 bool motor_pushed = false;
 bool is_correct_sensor = false;
+long int actuator_at_rest_time_now;
 SensorTouched touched_sensor = SensorTouched(false, false);
 SubjectLocation subject_location;
 
 void initSystem();
 void makeNewRewardLane();
-void beInsideLane();
+void resetSystem();
 void exitLane();
 void turnOffPiezo();
 void beOutsideLane();
-void resetSystem();
+void enterLane();
+void pushActuator();
+void reportActuatorAtMaxPush();
+void reportActuatorAtRest();
+void resetIsCorrectSensor();
+void reportSensorTouched();
+void checkGiveReward();
+void beInsideLane();
 void pullActuator();
 void resetMotors();
 
@@ -60,10 +68,17 @@ struct StateStruct
 {
   State* INITIALIZE = new State(initSystem, NULL, NULL);
   State* RESET_SYSTEM = new State(resetSystem, NULL, NULL);
-  State* INSIDE_LANE = new State(beInsideLane, NULL, NULL);
   State* EXITED_LANE = new State(exitLane, NULL, NULL);
   State* TURN_OFF_PIEZO = new State(turnOffPiezo, NULL, NULL);
   State* OUTSIDE_LANE = new State(beOutsideLane, NULL, NULL);
+  State* ENTERED_LANE = new State(enterLane, NULL, NULL);
+  State* PUSH_ACTUATOR = new State(pushActuator, NULL, NULL);
+  State* ACTUATOR_AT_MAX_PUSH = new State(reportActuatorAtMaxPush, NULL, NULL);
+  State* ACTUATOR_AT_REST = new State(reportActuatorAtRest, NULL, NULL);
+  State* RESET_IS_CORRECT_SENSOR = new State(resetIsCorrectSensor, NULL, NULL);
+  State* SENSOR_TOUCHED = new State(reportSensorTouched, NULL, NULL);
+  State* CHECK_GIVE_REWARD = new State(checkGiveReward, NULL, NULL);
+  State* INSIDE_LANE = new State(beInsideLane, NULL, NULL);
   State* PULL_ACTUATOR = new State(pullActuator, NULL, NULL);
   State* RESET_MOTORS = new State(resetMotors, NULL, NULL);
 };
@@ -71,9 +86,15 @@ struct StateStruct
 enum EventEnum
 {
   EVENT_RESET_SYSTEM,
-  EVENT_ENTERED_LANE,
   EVENT_EXITED_LANE,
   EVENT_TURN_OFF_PIEZO,
+  EVENT_ENTERED_LANE,
+  EVENT_PUSH_ACTUATOR,
+  EVENT_ACTUATOR_AT_MAX_PUSH,
+  EVENT_ACTUATOR_AT_REST,
+  EVENT_RESET_IS_CORRECT_SENSOR,
+  EVENT_SENSOR_TOUCHED,
+  EVENT_CHECK_GIVE_REWARD,
   EVENT_PULL_ACTUATOR,
   EVENT_RESET_MOTORS,
 };
@@ -90,25 +111,15 @@ void setup()
     state.RESET_SYSTEM,
     EVENT_RESET_SYSTEM,
     NULL);
-  fsm.add_transition(
+  fsm.add_timed_transition(
     state.RESET_SYSTEM,
-    state.INSIDE_LANE,
-    EVENT_ENTERED_LANE,
-    NULL);
-  fsm.add_transition(
-    state.INSIDE_LANE,
-    state.PULL_ACTUATOR,
-    EVENT_PULL_ACTUATOR,
+    state.OUTSIDE_LANE,
+    NO_DELAY,
     NULL);
   fsm.add_transition(
     state.RESET_SYSTEM,
     state.EXITED_LANE,
     EVENT_EXITED_LANE,
-    NULL);
-  fsm.add_timed_transition(
-    state.RESET_SYSTEM,
-    state.OUTSIDE_LANE,
-    NO_DELAY,
     NULL);
   fsm.add_transition(
     state.EXITED_LANE,
@@ -135,10 +146,90 @@ void setup()
     state.RESET_MOTORS,
     EVENT_RESET_MOTORS,
     NULL);
+  fsm.add_transition(
+    state.RESET_SYSTEM,
+    state.ENTERED_LANE,
+    EVENT_ENTERED_LANE,
+    NULL);
+  fsm.add_timed_transition(
+    state.ENTERED_LANE,
+    state.INSIDE_LANE,
+    NO_DELAY,
+    NULL);
+  fsm.add_transition(
+    state.ENTERED_LANE,
+    state.PUSH_ACTUATOR,
+    EVENT_PUSH_ACTUATOR,
+    NULL);
+  fsm.add_timed_transition(
+    state.PUSH_ACTUATOR,
+    state.INSIDE_LANE,
+    NO_DELAY,
+    NULL);
+  fsm.add_transition(
+    state.PUSH_ACTUATOR,
+    state.ACTUATOR_AT_MAX_PUSH,
+    EVENT_ACTUATOR_AT_MAX_PUSH,
+    NULL);
+  fsm.add_timed_transition(
+    state.ACTUATOR_AT_MAX_PUSH,
+    state.INSIDE_LANE,
+    NO_DELAY,
+    NULL);
+  fsm.add_transition(
+    state.ACTUATOR_AT_MAX_PUSH,
+    state.ACTUATOR_AT_REST,
+    EVENT_ACTUATOR_AT_REST,
+    NULL);
+  fsm.add_transition(
+    state.ACTUATOR_AT_REST,
+    state.RESET_IS_CORRECT_SENSOR,
+    EVENT_RESET_IS_CORRECT_SENSOR,
+    NULL);
+  fsm.add_timed_transition(
+    state.ACTUATOR_AT_REST,
+    state.INSIDE_LANE,
+    NO_DELAY,
+    NULL);
+  fsm.add_transition(
+    state.RESET_IS_CORRECT_SENSOR,
+    state.SENSOR_TOUCHED,
+    EVENT_SENSOR_TOUCHED,
+    NULL);
+  fsm.add_transition(
+    state.RESET_IS_CORRECT_SENSOR,
+    state.CHECK_GIVE_REWARD,
+    EVENT_CHECK_GIVE_REWARD,
+    NULL);
+  fsm.add_timed_transition(
+    state.RESET_IS_CORRECT_SENSOR,
+    state.INSIDE_LANE,
+    NO_DELAY,
+    NULL);
+  fsm.add_transition(
+    state.SENSOR_TOUCHED,
+    state.CHECK_GIVE_REWARD,
+    EVENT_CHECK_GIVE_REWARD,
+    NULL);
+  fsm.add_timed_transition(
+    state.SENSOR_TOUCHED,
+    state.INSIDE_LANE,
+    NO_DELAY,
+    NULL);
+  fsm.add_timed_transition(
+    state.CHECK_GIVE_REWARD,
+    state.INSIDE_LANE,
+    NO_DELAY,
+    NULL);
+  fsm.add_transition(
+    state.INSIDE_LANE,
+    state.PULL_ACTUATOR,
+    EVENT_PULL_ACTUATOR,
+    NULL);
   fsm.add_timed_transition(
     state.INSIDE_LANE,
     state.RESET_MOTORS,
-    NO_DELAY,
+    EVENT_RESET_MOTORS,
     NULL);
   fsm.add_timed_transition(
     state.PULL_ACTUATOR,
@@ -242,6 +333,93 @@ void triggerEnterLaneEvent()
   }
 }
 
+void triggerPushActuatorEvent()
+{
+  #if ENABLE_VIRTUAL_MOUSE
+  bool push_actuator_condition = true;
+  #else
+  bool push_actuator_condition = is_within_reward_lane_angle && shouldTriggerMotor();
+  #endif
+  if (push_actuator_condition) {
+    #if ENABLE_TRIGGER_EVENT_MSGS
+    Serial.println("Triggering EVENT_PUSH_ACTUATOR");
+    #endif
+    fsm.trigger(EVENT_PUSH_ACTUATOR);
+  }
+}
+
+void triggerActuatorAtMaxPushEvent()
+{
+  #if ENABLE_VIRTUAL_MOUSE
+  bool actuator_is_at_max_push = true;
+  #else
+  bool actuator_is_at_max_push = global_state.actuator_at_max_push;
+  #endif
+  if (actuator_is_at_max_push) {
+    #if ENABLE_TRIGGER_EVENT_MSGS
+    Serial.println("Triggering EVENT_ACTUATOR_AT_MAX_PUSH");
+    #endif
+    fsm.trigger(EVENT_ACTUATOR_AT_MAX_PUSH);
+  }
+}
+
+void triggerActuatorAtRestEvent()
+{
+  // Allow a bit of buffer time for sensor vibration to
+  // rest before reading
+  long int time_now = millis();
+  #if ENABLE_VIRTUAL_MOUSE
+  bool max_push_wait_exceeded = true;
+  #else
+  bool max_push_wait_exceeded = global_state.max_push_current_duration <= time_now - global_state.MAX_PUSH_WAIT;
+  #endif
+  if (max_push_wait_exceeded) {
+    actuator_at_rest_time_now = time_now;
+    #if ENABLE_TRIGGER_EVENT_MSGS
+    Serial.println("Triggering EVENT_ACTUATOR_AT_REST");
+    #endif
+    fsm.trigger(EVENT_ACTUATOR_AT_REST);
+  }
+}
+
+void triggerResetIsCorrectSensor()
+{
+  #if ENABLE_TRIGGER_EVENT_MSGS
+  Serial.println("Triggering EVENT_RESET_IS_CORRECT_SENSOR");
+  #endif
+  fsm.trigger(EVENT_RESET_IS_CORRECT_SENSOR);
+}
+
+void triggerSensorTouchedEvent()
+{
+  // #if ENABLE_TRIGGER_EVENT_MSGS
+  // bool sensor_was_touched = true;
+  // #else
+  // bool sensor_was_touched = touched_sensor.change_happened && !global_state.sensor_was_touched;
+  // #endif
+  // if (sensor_was_touched) {
+  //   #if ENABLE_TRIGGER_EVENT_MSGS
+  //   Serial.println("Triggering EVENT_SENSOR_TOUCHED");
+  //   #endif
+  //   fsm.trigger(EVENT_SENSOR_TOUCHED);
+  // }
+}
+
+void triggerCheckGiveRewardEvent()
+{
+  #if ENABLE_TRIGGER_EVENT_MSGS
+  bool check_give_reward_condition = true;
+  #else
+  bool check_give_reward_condition = global_state.is_automated_reward || touched_sensor.change_happened;
+  #endif
+  if (check_give_reward_condition) {
+    #if ENABLE_TRIGGER_EVENT_MSGS
+    Serial.println("Triggering EVENT_CHECK_GIVE_REWARD");
+    #endif
+    fsm.trigger(EVENT_CHECK_GIVE_REWARD);
+  }
+}
+
 void triggerExitLaneEvent()
 {
   if (!is_inside_lane && global_state.was_inside_lane) {
@@ -288,9 +466,15 @@ void triggerResetMotorsEvent()
 void triggerNewEvents()
 {
   triggerResetSystemEvent();
-  triggerEnterLaneEvent();
   triggerExitLaneEvent();
   triggerTurnOffPiezoEvent();
+  triggerEnterLaneEvent();
+  triggerPushActuatorEvent();
+  triggerActuatorAtMaxPushEvent();
+  triggerActuatorAtRestEvent();
+  triggerResetIsCorrectSensor();
+  triggerSensorTouchedEvent();
+  triggerCheckGiveRewardEvent();
   triggerPullActuatorEvent();
   triggerResetMotorsEvent();
 }
@@ -511,11 +695,24 @@ void checkForceSensorMode(bool is_left_sensor_touched)
   }
 }
 
-void checkGiveReward(bool is_correct_sensor, bool is_automated_reward)
+void resetIsCorrectSensor()
 {
+  #if DEBUG
+  Serial.println("In resetIsCorrectSensor()");
+  #endif
+  // Call isCorrectSensor() anyway so it'd call
+  // writeStats() on the touched sensor
+  is_correct_sensor = isCorrectSensor();
+}
+
+void checkGiveReward()
+{
+  #if DEBUG
+  Serial.println("In checkGiveReward()");
+  #endif
   if (global_state.reward_given)
     return;
-  if (is_correct_sensor || is_automated_reward)
+  if (is_correct_sensor || global_state.is_automated_reward)
   {
     // Report if reward was given due to correct sensor was touched or
     // due to wrong sensore touched but automated reward is enabled
@@ -1200,65 +1397,77 @@ void turnOffMotors()
   }
 }
 
-void beInsideLane()
+void enterLane()
 {
   #if DEBUG
-  Serial.println("In beInsideLane()");
+  Serial.println("In enterLane()");
   #endif
   if (!global_state.was_inside_lane)
     writeStats(Stats.ENTERED_LANE(global_state.current_lane));
   global_state.was_inside_lane = true;
-  if (is_within_reward_lane_angle && shouldTriggerMotor())
+}
+
+void pushActuator()
+{
+  #if DEBUG
+  Serial.println("In pushActuator()");
+  #endif
+  actuator.setState(Actuator::PUSH);
+  if (global_state.last_reported_actuator_status != Actuator::PUSH)
   {
-    actuator.setState(Actuator::PUSH);
-    if (global_state.last_reported_actuator_status != Actuator::PUSH)
-    {
-      writeStats(Stats.MOTOR_PUSHED());
-      global_state.last_reported_actuator_status = Actuator::PUSH;
-      global_state.sensor_was_touched = false;
-    }
-    motor_pushed = true;
-    if (global_state.actuator_at_max_push)
-    {
-      if (!global_state.reported_motor_max_distance)
-      {
-        writeStats(Stats.MOTOR_MAX_RANGE());
-        global_state.reported_motor_max_distance = true;
-      }
-      // Allow a bit of buffer time for sensor vibration to
-      // rest before reading
-      long int time_now = millis();
-      bool max_push_wait_exceeded = global_state.max_push_current_duration <= time_now - global_state.MAX_PUSH_WAIT;
-      if (max_push_wait_exceeded)
-      {
-        if (!global_state.reported_motor_max_wait)
-        {
-          Serial.print("max_push_current_duration: ");
-          Serial.print(global_state.max_push_current_duration);
-          Serial.print(" - MAX_PUSH_WAIT: ");
-          Serial.print(global_state.MAX_PUSH_WAIT);
-          Serial.print("- time_now: ");
-          Serial.println(time_now);
-          writeStats(Stats.MOTOR_WAIT_DONE());
-          global_state.reported_motor_max_wait = true;
-        }
-        // Call isCorrectSensor() anyway so it'd call
-        // writeStats() on the touched sensor
-        // is_correct_sensor = isCorrectSensor(touched_sensor);
-        // if (touched_sensor.change_happened &&
-        //     !global_state.sensor_was_touched)
-        // {
-        //     global_state.sensor_was_touched = true;
-        //     if (is_correct_sensor)
-        //         global_state.miss_or_wrong_touch_count = 0;
-        //     else
-        //         global_state.miss_or_wrong_touch_count += 1;
-        // }
-        if (global_state.is_automated_reward || touched_sensor.change_happened)
-          checkGiveReward(is_correct_sensor, global_state.is_automated_reward);
-      }
-    }
+    writeStats(Stats.MOTOR_PUSHED());
+    global_state.last_reported_actuator_status = Actuator::PUSH;
+    global_state.sensor_was_touched = false;
   }
+  motor_pushed = true;
+}
+
+void reportActuatorAtMaxPush()
+{
+  #if DEBUG
+  Serial.println("In reportActuatorAtMaxPush()");
+  #endif
+  if (!global_state.reported_motor_max_distance)
+  {
+    writeStats(Stats.MOTOR_MAX_RANGE());
+    global_state.reported_motor_max_distance = true;
+  }
+}
+
+void reportActuatorAtRest()
+{
+  #if DEBUG
+  Serial.println("In reportActuatorAtRest()");
+  #endif
+  if (!global_state.reported_motor_max_wait)
+  {
+    Serial.print("max_push_current_duration: ");
+    Serial.print(global_state.max_push_current_duration);
+    Serial.print(" - MAX_PUSH_WAIT: ");
+    Serial.print(global_state.MAX_PUSH_WAIT);
+    Serial.print("- time_now: ");
+    Serial.println(actuator_at_rest_time_now);
+    writeStats(Stats.MOTOR_WAIT_DONE());
+    global_state.reported_motor_max_wait = true;
+  }
+}
+
+void reportSensorTouched()
+{
+  #if DEBUG
+  Serial.println("In reportSensorTouched()");
+  #endif
+  // global_state.sensor_was_touched = true;
+  // if (is_correct_sensor)
+  //   global_state.miss_or_wrong_touch_count = 0;
+  // else
+  //   global_state.miss_or_wrong_touch_count += 1;
+}
+
+void beInsideLane(){
+  #if DEBUG
+  Serial.println("In beInsideLane()");
+  #endif
 }
 
 void exitLane()
