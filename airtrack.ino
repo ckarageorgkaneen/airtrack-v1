@@ -448,10 +448,11 @@ void triggerTurnOffPiezoEvent()
 void triggerPullActuatorEvent()
 {
   #if ENABLE_VIRTUAL_MOUSE
-  if (!motor_pushed)
+  bool pull_actuator_condition = true;
   #else
-  if (subject_location.block_detected && !motor_pushed)
+  bool pull_actuator_condition = subject_location.block_detected && !motor_pushed;
   #endif
+  if (pull_actuator_condition)
   {
     #if ENABLE_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_PULL_ACTUATOR");
