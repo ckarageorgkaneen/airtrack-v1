@@ -253,6 +253,9 @@ void loop()
 
 void initSystem()
 {
+  #if DEBUG_STATE_FUNCTIONS
+  Serial.println("In initSystem().");
+  #endif
   Serial.println("Initializing system.");
   sensor.setup();
   actuator.setup();
