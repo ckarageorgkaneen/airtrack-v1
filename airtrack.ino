@@ -86,6 +86,7 @@ struct StateStruct
 enum EventEnum
 {
   EVENT_RESET_SYSTEM,
+  EVENT_BE_OUTSIDE_LANE,
   EVENT_EXIT_LANE,
   EVENT_TURN_OFF_PIEZO,
   EVENT_ENTER_LANE,
@@ -111,10 +112,10 @@ void setup()
     state.RESET_SYSTEM,
     EVENT_RESET_SYSTEM,
     NULL);
-  fsm.add_timed_transition(
+  fsm.add_transition(
     state.RESET_SYSTEM,
     state.OUTSIDE_LANE,
-    NO_DELAY,
+    EVENT_BE_OUTSIDE_LANE,
     NULL);
   fsm.add_transition(
     state.RESET_SYSTEM,
@@ -420,13 +421,18 @@ void triggerCheckGiveRewardEvent()
   }
 }
 
-void triggerExitLaneEvent()
+void triggerOutsideLaneEvents()
 {
   if (!is_inside_lane && global_state.was_inside_lane) {
     #if ENABLE_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_EXIT_LANE");
     #endif
     fsm.trigger(EVENT_EXIT_LANE);
+  } else if (!is_inside_lane) {
+    #if ENABLE_TRIGGER_EVENT_MSGS
+    Serial.println("Triggering EVENT_BE_OUTSIDE_LANE");
+    #endif
+    fsm.trigger(EVENT_BE_OUTSIDE_LANE);
   }
 }
 
@@ -472,7 +478,7 @@ void triggerResetMotorsEvent()
 void triggerNewEvents()
 {
   triggerResetSystemEvent();
-  triggerExitLaneEvent();
+  triggerOutsideLaneEvents();
   triggerTurnOffPiezoEvent();
   triggerEnterLaneEvent();
   triggerPushActuatorEvent();
