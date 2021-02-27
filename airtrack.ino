@@ -60,7 +60,8 @@ void reportActuatorAtMaxPush();
 void reportActuatorAtRest();
 void resetIsCorrectSensor();
 void reportSensorTouched();
-void checkGiveReward();
+void reward();
+void signalNoReward();
 void beInsideLane();
 void pullActuator();
 void resetMotors();
@@ -78,7 +79,8 @@ struct StateStruct
   State* ACTUATOR_AT_REST = new State(reportActuatorAtRest, NULL, NULL);
   State* RESET_IS_CORRECT_SENSOR = new State(resetIsCorrectSensor, NULL, NULL);
   State* SENSOR_TOUCHED = new State(reportSensorTouched, NULL, NULL);
-  State* CHECK_GIVE_REWARD = new State(checkGiveReward, NULL, NULL);
+  State* REWARD = new State(reward, NULL, NULL);
+  State* NO_REWARD = new State(signalNoReward, NULL, NULL);
   State* INSIDE_LANE = new State(beInsideLane, NULL, NULL);
   State* PULL_ACTUATOR = new State(pullActuator, NULL, NULL);
   State* RESET_MOTORS = new State(resetMotors, NULL, NULL);
@@ -96,7 +98,8 @@ enum EventEnum
   EVENT_ACTUATOR_AT_REST,
   EVENT_RESET_IS_CORRECT_SENSOR,
   EVENT_SENSOR_TOUCHED,
-  EVENT_CHECK_GIVE_REWARD,
+  EVENT_REWARD,
+  EVENT_NO_REWARD,
   EVENT_PULL_ACTUATOR,
   EVENT_RESET_MOTORS,
 };
@@ -200,8 +203,13 @@ void setup()
     NULL);
   fsm.add_transition(
     state.RESET_IS_CORRECT_SENSOR,
-    state.CHECK_GIVE_REWARD,
-    EVENT_CHECK_GIVE_REWARD,
+    state.REWARD,
+    EVENT_REWARD,
+    NULL);
+  fsm.add_transition(
+    state.RESET_IS_CORRECT_SENSOR,
+    state.NO_REWARD,
+    EVENT_NO_REWARD,
     NULL);
   fsm.add_timed_transition(
     state.RESET_IS_CORRECT_SENSOR,
@@ -210,8 +218,13 @@ void setup()
     NULL);
   fsm.add_transition(
     state.SENSOR_TOUCHED,
-    state.CHECK_GIVE_REWARD,
-    EVENT_CHECK_GIVE_REWARD,
+    state.REWARD,
+    EVENT_REWARD,
+    NULL);
+  fsm.add_transition(
+    state.SENSOR_TOUCHED,
+    state.NO_REWARD,
+    EVENT_NO_REWARD,
     NULL);
   fsm.add_timed_transition(
     state.SENSOR_TOUCHED,
@@ -219,7 +232,12 @@ void setup()
     NO_DELAY,
     NULL);
   fsm.add_timed_transition(
-    state.CHECK_GIVE_REWARD,
+    state.REWARD,
+    state.INSIDE_LANE,
+    NO_DELAY,
+    NULL);
+  fsm.add_timed_transition(
+    state.NO_REWARD,
     state.INSIDE_LANE,
     NO_DELAY,
     NULL);
@@ -410,20 +428,29 @@ void triggerSensorTouchedEvent()
   // }
 }
 
-void triggerCheckGiveRewardEvent()
+void triggerRewardEvents()
 {
   #if DEBUG_W_VIRTUAL_MOUSE
-  bool check_give_reward_condition = true;
+  bool decide_reward_condition = true;
   #else
-  bool check_give_reward_condition = (global_state.is_automated_reward
-                                      || touched_sensor.change_happened)
-                                      && !global_state.reward_given;
+  bool decide_reward_condition = (global_state.is_automated_reward || touched_sensor.change_happened) && !global_state.reward_given;
   #endif
-  if (check_give_reward_condition) {
-    #if DEBUG_TRIGGER_EVENT_MSGS
-    Serial.println("Triggering EVENT_CHECK_GIVE_REWARD");
+  if (decide_reward_condition && !global_state.reward_given) {
+    bool reward_condition = (is_correct_sensor || global_state.is_automated_reward);
+    if (reward_condition) {
+      #if DEBUG_TRIGGER_EVENT_MSGS
+      Serial.println("Triggering EVENT_REWARD");
+      #endif
+      fsm.trigger(EVENT_REWARD);
+    } else {
+      #if DEBUG_TRIGGER_EVENT_MSGS
+      Serial.println("Triggering EVENT_NO_REWARD");
+      #endif
+      fsm.trigger(EVENT_NO_REWARD);
+    }
+    #if !DEBUG_W_VIRTUAL_MOUSE
+    global_state.reward_given = true;
     #endif
-    fsm.trigger(EVENT_CHECK_GIVE_REWARD);
   }
 }
 
@@ -492,7 +519,7 @@ void triggerNewEvents()
   triggerActuatorAtRestEvent();
   triggerResetIsCorrectSensor();
   triggerSensorTouchedEvent();
-  triggerCheckGiveRewardEvent();
+  triggerRewardEvents();
   triggerPullActuatorEvent();
   triggerResetMotorsEvent();
 }
@@ -723,48 +750,48 @@ void resetIsCorrectSensor()
   is_correct_sensor = isCorrectSensor();
 }
 
-void checkGiveReward()
+void reward()
 {
   #if DEBUG_STATE_FUNCTIONS
-  Serial.println("In checkGiveReward()");
+  Serial.println("In reward()");
   #endif
-  if (is_correct_sensor || global_state.is_automated_reward)
-  {
-    // Report if reward was given due to correct sensor was touched or
-    // due to wrong sensore touched but automated reward is enabled
-    writeStats(Stats.REWARD_GIVEN(is_correct_sensor == false));
-    // TODO: Clean hacky way
-    global_state.delayed_report = millis() + 2000;
+  // Report if reward was given due to correct sensor was touched or
+  // due to wrong sensore touched but automated reward is enabled
+  writeStats(Stats.REWARD_GIVEN(is_correct_sensor == false));
+  // TODO: Clean hacky way
+  global_state.delayed_report = millis() + 2000;
 
-    Lane lane = global_state.lanes[global_state.reward_lane_id];
-    if (lane.reward_sensor == sensor.RIGHT_ANALOUGE_PIN)
-    {
-      writeStats(Stats.SOLENOID_RIGHT_ON());
-      turnOnMotor(Pins.SolenoidRight, global_state.SOLENOID_DURATION);
-    }
-    else if (lane.reward_sensor == sensor.LEFT_ANALOUGE_PIN)
-    {
-      writeStats(Stats.SOLENOID_LEFT_ON());
-      Serial.write("Reward given");
-      digitalWrite(PIN_PUMP_ACTIVATOR_PULSE, HIGH);
-      delayMicroseconds(global_state.SOLENOID_DURATION);
-      digitalWrite(PIN_PUMP_ACTIVATOR_PULSE, LOW);
-      //turnOnMotor(Pins.SolenoidLeft, global_state.SOLENOID_DURATION);
-    }
-    else
-    {
-      Serial.println("Want to give reward - Unknown Solenoid");
-    }
-    setActuatorTimeout(global_state.ALLOWED_REWARD_TIMEOUT);
+  Lane lane = global_state.lanes[global_state.reward_lane_id];
+  if (lane.reward_sensor == sensor.RIGHT_ANALOUGE_PIN)
+  {
+    writeStats(Stats.SOLENOID_RIGHT_ON());
+    turnOnMotor(Pins.SolenoidRight, global_state.SOLENOID_DURATION);
+  }
+  else if (lane.reward_sensor == sensor.LEFT_ANALOUGE_PIN)
+  {
+    writeStats(Stats.SOLENOID_LEFT_ON());
+    Serial.write("Reward given");
+    digitalWrite(PIN_PUMP_ACTIVATOR_PULSE, HIGH);
+    delayMicroseconds(global_state.SOLENOID_DURATION);
+    digitalWrite(PIN_PUMP_ACTIVATOR_PULSE, LOW);
+    //turnOnMotor(Pins.SolenoidLeft, global_state.SOLENOID_DURATION);
   }
   else
   {
-    //Serial.println("No reward");
-    writeStats(Stats.REWARD_NOT_GIVEN());
-    setActuatorTimeout(global_state.NO_REWARD_TIMEOUT);
-    global_state.piezo_motor_entry = turnOnMotor(Pins.PiezoTone, global_state.PEIZO_TIMEOUT);
+    Serial.println("Want to give reward - Unknown Solenoid");
   }
-  global_state.reward_given = true;
+  setActuatorTimeout(global_state.ALLOWED_REWARD_TIMEOUT);
+}
+
+void signalNoReward()
+{
+  #if DEBUG_STATE_FUNCTIONS
+  Serial.println("In signalNoReward()");
+  #endif
+  //Serial.println("No reward");
+  writeStats(Stats.REWARD_NOT_GIVEN());
+  setActuatorTimeout(global_state.NO_REWARD_TIMEOUT);
+  global_state.piezo_motor_entry = turnOnMotor(Pins.PiezoTone, global_state.PEIZO_TIMEOUT);
 }
 
 void makeNewRewardLane()
