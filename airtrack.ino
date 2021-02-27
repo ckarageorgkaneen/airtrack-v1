@@ -397,7 +397,7 @@ void triggerResetIsCorrectSensor()
 
 void triggerSensorTouchedEvent()
 {
-  // #if DEBUG_TRIGGER_EVENT_MSGS
+  // #if DEBUG_W_VIRTUAL_MOUSE
   // bool sensor_was_touched = true;
   // #else
   // bool sensor_was_touched = touched_sensor.change_happened && !global_state.sensor_was_touched;
@@ -412,7 +412,7 @@ void triggerSensorTouchedEvent()
 
 void triggerCheckGiveRewardEvent()
 {
-  #if DEBUG_TRIGGER_EVENT_MSGS
+  #if DEBUG_W_VIRTUAL_MOUSE
   bool check_give_reward_condition = true;
   #else
   bool check_give_reward_condition = (global_state.is_automated_reward
