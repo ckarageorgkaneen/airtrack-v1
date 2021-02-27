@@ -415,7 +415,9 @@ void triggerCheckGiveRewardEvent()
   #if DEBUG_TRIGGER_EVENT_MSGS
   bool check_give_reward_condition = true;
   #else
-  bool check_give_reward_condition = global_state.is_automated_reward || touched_sensor.change_happened;
+  bool check_give_reward_condition = (global_state.is_automated_reward
+                                      || touched_sensor.change_happened)
+                                      && !global_state.reward_given;
   #endif
   if (check_give_reward_condition) {
     #if DEBUG_TRIGGER_EVENT_MSGS
@@ -726,8 +728,6 @@ void checkGiveReward()
   #if DEBUG_STATE_FUNCTIONS
   Serial.println("In checkGiveReward()");
   #endif
-  if (global_state.reward_given)
-    return;
   if (is_correct_sensor || global_state.is_automated_reward)
   {
     // Report if reward was given due to correct sensor was touched or
