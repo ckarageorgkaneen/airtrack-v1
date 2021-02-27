@@ -65,6 +65,7 @@ void signalNoReward();
 void beInsideLane();
 void pullActuator();
 void resetMotors();
+void turnOnActuator();
 
 struct StateStruct
 {
@@ -84,6 +85,7 @@ struct StateStruct
   State* INSIDE_LANE = new State(beInsideLane, NULL, NULL);
   State* PULL_ACTUATOR = new State(pullActuator, NULL, NULL);
   State* RESET_MOTORS = new State(resetMotors, NULL, NULL);
+  State* TURN_ON_ACTUATOR = new State(turnOnActuator, NULL, NULL);
 };
 
 enum EventEnum
@@ -102,6 +104,7 @@ enum EventEnum
   EVENT_NO_REWARD,
   EVENT_PULL_ACTUATOR,
   EVENT_RESET_MOTORS,
+  EVENT_TURN_ON_ACTUATOR_AFTER_DELAY,
 };
 
 struct StateStruct state;
@@ -251,10 +254,20 @@ void setup()
     state.RESET_MOTORS,
     EVENT_RESET_MOTORS,
     NULL);
-  fsm.add_timed_transition(
+  fsm.add_transition(
     state.PULL_ACTUATOR,
     state.RESET_MOTORS,
-    NO_DELAY,
+    EVENT_RESET_MOTORS,
+    NULL);
+  fsm.add_transition(
+    state.RESET_MOTORS,
+    state.TURN_ON_ACTUATOR,
+    EVENT_TURN_ON_ACTUATOR_AFTER_DELAY,
+    NULL);
+  fsm.add_transition(
+    state.TURN_ON_ACTUATOR,
+    state.RESET_SYSTEM,
+    EVENT_RESET_SYSTEM,
     NULL);
   fsm.add_transition(
     state.RESET_MOTORS,
@@ -318,6 +331,9 @@ void resetSystem()
 
 void turnOnActuator()
 {
+  #if DEBUG_STATE_FUNCTIONS
+  Serial.println("In turnOnActuator().");
+  #endif
   // TODO: Do it cleanly
   turnOnMotor(13, 20);
 }
@@ -327,15 +343,8 @@ void resetMotors()
   #if DEBUG_STATE_FUNCTIONS
   Serial.println("In resetMotors().");
   #endif
-  global_state.was_inside_lane = is_inside_lane;
   turnOffMotors();
   actuator.motorLoop();
-  long int time_now = millis();
-  if (global_state.delayed_report && (time_now >= global_state.delayed_report))
-  {
-    turnOnActuator();
-    global_state.delayed_report = 0;
-  }
 }
 
 void triggerResetSystemEvent()
@@ -505,7 +514,25 @@ void triggerResetMotorsEvent()
   #if DEBUG_TRIGGER_EVENT_MSGS
   Serial.println("Triggering EVENT_RESET_MOTORS");
   #endif
+  global_state.was_inside_lane = is_inside_lane;
   fsm.trigger(EVENT_RESET_MOTORS);
+}
+
+void triggerTurnOnActuatorAfterDelayEvent()
+{
+  #if DEBUG_W_VIRTUAL_MOUSE
+  bool delay_timed_out = true;
+  #else
+  long int time_now = millis();
+  bool delay_timed_out = global_state.delayed_report && (time_now >= global_state.delayed_report);
+  #endif
+  if (delay_timed_out) {
+    #if DEBUG_TRIGGER_EVENT_MSGS
+    Serial.println("Triggering EVENT_TURN_ON_ACTUATOR_AFTER_DELAY");
+    #endif
+    fsm.trigger(EVENT_TURN_ON_ACTUATOR_AFTER_DELAY);
+    global_state.delayed_report = 0;
+  }
 }
 
 void triggerNewEvents()
@@ -522,6 +549,7 @@ void triggerNewEvents()
   triggerRewardEvents();
   triggerPullActuatorEvent();
   triggerResetMotorsEvent();
+  triggerTurnOnActuatorAfterDelayEvent();
 }
 
 bool isInsideLane()
