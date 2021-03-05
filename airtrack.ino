@@ -44,6 +44,7 @@ bool is_within_reward_lane_angle = false;
 bool is_inside_lane = false;
 bool motor_pushed = false;
 bool is_correct_sensor = false;
+bool is_delay_timed_out = false;
 long int actuator_at_rest_time_now;
 SensorTouched touched_sensor = SensorTouched(false, false);
 SubjectLocation subject_location;
@@ -336,6 +337,8 @@ void turnOnActuator()
   #endif
   // TODO: Do it cleanly
   turnOnMotor(13, 20);
+  if (is_delay_timed_out)
+    global_state.delayed_report = 0;
 }
 
 void resetMotors()
@@ -457,9 +460,6 @@ void triggerRewardEvents()
       #endif
       fsm.trigger(EVENT_NO_REWARD);
     }
-    #if !DEBUG_W_VIRTUAL_MOUSE
-    global_state.reward_given = true;
-    #endif
   }
 }
 
@@ -514,24 +514,22 @@ void triggerResetMotorsEvent()
   #if DEBUG_TRIGGER_EVENT_MSGS
   Serial.println("Triggering EVENT_RESET_MOTORS");
   #endif
-  global_state.was_inside_lane = is_inside_lane;
   fsm.trigger(EVENT_RESET_MOTORS);
 }
 
 void triggerTurnOnActuatorAfterDelayEvent()
 {
   #if DEBUG_W_VIRTUAL_MOUSE
-  bool delay_timed_out = true;
+  is_delay_timed_out = true;
   #else
   long int time_now = millis();
-  bool delay_timed_out = global_state.delayed_report && (time_now >= global_state.delayed_report);
+  is_delay_timed_out = global_state.delayed_report && (time_now >= global_state.delayed_report);
   #endif
-  if (delay_timed_out) {
+  if (is_delay_timed_out) {
     #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_TURN_ON_ACTUATOR_AFTER_DELAY");
     #endif
     fsm.trigger(EVENT_TURN_ON_ACTUATOR_AFTER_DELAY);
-    global_state.delayed_report = 0;
   }
 }
 
@@ -809,6 +807,7 @@ void reward()
     Serial.println("Want to give reward - Unknown Solenoid");
   }
   setActuatorTimeout(global_state.ALLOWED_REWARD_TIMEOUT);
+  global_state.reward_given = true;
 }
 
 void signalNoReward()
@@ -820,6 +819,7 @@ void signalNoReward()
   writeStats(Stats.REWARD_NOT_GIVEN());
   setActuatorTimeout(global_state.NO_REWARD_TIMEOUT);
   global_state.piezo_motor_entry = turnOnMotor(Pins.PiezoTone, global_state.PEIZO_TIMEOUT);
+  global_state.reward_given = true;
 }
 
 void makeNewRewardLane()
@@ -1475,7 +1475,6 @@ void enterLane()
   #endif
   if (!global_state.was_inside_lane)
     writeStats(Stats.ENTERED_LANE(global_state.current_lane));
-  global_state.was_inside_lane = true;
 }
 
 void pushActuator()
@@ -1539,6 +1538,7 @@ void beInsideLane(){
   #if DEBUG_STATE_FUNCTIONS
   Serial.println("In beInsideLane()");
   #endif
+  global_state.was_inside_lane = true;
 }
 
 void reportExitedLane()
