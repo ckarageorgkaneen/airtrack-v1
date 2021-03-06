@@ -109,7 +109,7 @@ enum EventEnum
   EVENT_PULL_ACTUATOR,
   EVENT_RESET_MOTORS,
   EVENT_ACTUATOR_AT_MIN_PULL_UNREPORTED,
-  EVENT_TURN_ON_ACTUATOR_AFTER_DELAY,
+  EVENT_DELAY_TIMED_OUT,
 };
 
 struct StateStruct state;
@@ -277,7 +277,7 @@ void setup()
   fsm.add_transition(
     state.RESET_MOTORS,
     state.TURN_ON_ACTUATOR_AFTER_DELAY,
-    EVENT_TURN_ON_ACTUATOR_AFTER_DELAY,
+    EVENT_DELAY_TIMED_OUT,
     NULL);
   fsm.add_transition(
     state.TURN_ON_ACTUATOR_AFTER_DELAY,
@@ -561,7 +561,7 @@ void triggerResetMotorsEvent()
   fsm.trigger(EVENT_RESET_MOTORS);
 }
 
-void triggerTurnOnActuatorAfterDelayEvent()
+void triggerDelayTimedOutEvent()
 {
   #if DEBUG_W_VIRTUAL_MOUSE
   is_delay_timed_out = true;
@@ -571,9 +571,9 @@ void triggerTurnOnActuatorAfterDelayEvent()
   #endif
   if (is_delay_timed_out) {
     #if DEBUG_TRIGGER_EVENT_MSGS
-    Serial.println("Triggering EVENT_TURN_ON_ACTUATOR_AFTER_DELAY");
+    Serial.println("Triggering EVENT_DELAY_TIMED_OUT");
     #endif
-    fsm.trigger(EVENT_TURN_ON_ACTUATOR_AFTER_DELAY);
+    fsm.trigger(EVENT_DELAY_TIMED_OUT);
   }
 }
 
@@ -592,7 +592,7 @@ void triggerNewEvents()
   triggerPullActuatorEvent();
   triggerActuatorAtMinPullEvent();
   triggerResetMotorsEvent();
-  triggerTurnOnActuatorAfterDelayEvent();
+  triggerDelayTimedOutEvent();
 }
 
 bool isInsideLane()
