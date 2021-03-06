@@ -475,7 +475,7 @@ void triggerRewardEvents()
   #else
   bool decide_reward_condition = (global_state.is_automated_reward || touched_sensor.change_happened) && !global_state.reward_given;
   #endif
-  if (decide_reward_condition && !global_state.reward_given) {
+  if (decide_reward_condition) {
     bool reward_condition = (is_correct_sensor || global_state.is_automated_reward);
     if (reward_condition) {
       #if DEBUG_TRIGGER_EVENT_MSGS
