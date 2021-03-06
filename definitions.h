@@ -127,6 +127,13 @@ struct GlobalState
    bool is_automated_reward;
 
    long int delayed_report;
+
+   bool is_within_reward_lane_angle;
+   bool is_inside_lane;
+   bool motor_pushed;
+   bool is_correct_sensor;
+   bool is_delay_timed_out;
+   long int actuator_at_rest_time_now;
 };
 
 struct DistancesStruct

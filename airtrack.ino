@@ -40,12 +40,6 @@ Pixy pixy;
 //Servo myservoright;
 int time_counter = 0;
 int opto_activation_trial = -1;
-bool is_within_reward_lane_angle = false;
-bool is_inside_lane = false;
-bool motor_pushed = false;
-bool is_correct_sensor = false;
-bool is_delay_timed_out = false;
-long int actuator_at_rest_time_now;
 SensorTouched touched_sensor = SensorTouched(false, false);
 SubjectLocation subject_location;
 
@@ -330,12 +324,12 @@ void resetSystem()
     pulsePumpActivator();
   resetSubjectLocation();
   resetIsInsideLaneFlags();
-  //move_training_servos(subject_location.angle, is_within_reward_lane_angle);
-  motor_pushed = false;
-  // if(time_counter < TIME_UNTIL_TRAINING + 10 && !is_within_reward_lane_angle){
+  //move_training_servos(subject_location.angle, global_state.is_within_reward_lane_angle);
+  global_state.motor_pushed = false;
+  // if(time_counter < TIME_UNTIL_TRAINING + 10 && !global_state.is_within_reward_lane_angle){
   //   time_counter++;
   // }
-  // if(time_counter > TIME_UNTIL_TRAINING && TRAINING_MODE && global_state.Servo1_pos < 160*SERVO_FACTOR && !is_within_reward_lane_angle){
+  // if(time_counter > TIME_UNTIL_TRAINING && TRAINING_MODE && global_state.Servo1_pos < 160*SERVO_FACTOR && !global_state.is_within_reward_lane_angle){
   //   global_state.Servo1_pos += 1;
   //   myservo1.write(global_state.Servo1_pos/SERVO_FACTOR);
   // }
@@ -388,7 +382,7 @@ void triggerResetSystemEvent()
 
 void triggerEnterLaneEvent()
 {
-  if (is_inside_lane) {
+  if (global_state.is_inside_lane) {
     #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_ENTER_LANE");
     #endif
@@ -401,7 +395,7 @@ void triggerPushActuatorEvent()
   #if DEBUG_W_VIRTUAL_MOUSE
   bool push_actuator_condition = true;
   #else
-  bool push_actuator_condition = is_within_reward_lane_angle && shouldTriggerMotor();
+  bool push_actuator_condition = global_state.is_within_reward_lane_angle && shouldTriggerMotor();
   #endif
   if (push_actuator_condition) {
     #if DEBUG_TRIGGER_EVENT_MSGS
@@ -437,7 +431,7 @@ void triggerActuatorAtRestEvent()
   bool max_push_wait_exceeded = global_state.max_push_current_duration <= time_now - global_state.MAX_PUSH_WAIT;
   #endif
   if (max_push_wait_exceeded) {
-    actuator_at_rest_time_now = time_now;
+    global_state.actuator_at_rest_time_now = time_now;
     #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_ACTUATOR_AT_REST");
     #endif
@@ -476,7 +470,7 @@ void triggerRewardEvents()
   bool decide_reward_condition = (global_state.is_automated_reward || touched_sensor.change_happened) && !global_state.reward_given;
   #endif
   if (decide_reward_condition) {
-    bool reward_condition = (is_correct_sensor || global_state.is_automated_reward);
+    bool reward_condition = (global_state.is_correct_sensor || global_state.is_automated_reward);
     if (reward_condition) {
       #if DEBUG_TRIGGER_EVENT_MSGS
       Serial.println("Triggering EVENT_REWARD");
@@ -493,12 +487,12 @@ void triggerRewardEvents()
 
 void triggerOutsideLaneEvents()
 {
-  if (!is_inside_lane && global_state.was_inside_lane) {
+  if (!global_state.is_inside_lane && global_state.was_inside_lane) {
     #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_EXIT_LANE");
     #endif
     fsm.trigger(EVENT_EXIT_LANE);
-  } else if (!is_inside_lane) {
+  } else if (!global_state.is_inside_lane) {
     #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_BE_OUTSIDE_LANE");
     #endif
@@ -526,7 +520,7 @@ void triggerPullActuatorEvent()
   #if DEBUG_W_VIRTUAL_MOUSE
   bool pull_actuator_condition = true;
   #else
-  bool pull_actuator_condition = subject_location.block_detected && !motor_pushed;
+  bool pull_actuator_condition = subject_location.block_detected && !global_state.motor_pushed;
   #endif
   if (pull_actuator_condition)
   {
@@ -564,12 +558,12 @@ void triggerResetMotorsEvent()
 void triggerDelayTimedOutEvent()
 {
   #if DEBUG_W_VIRTUAL_MOUSE
-  is_delay_timed_out = true;
+  global_state.is_delay_timed_out = true;
   #else
   long int time_now = millis();
-  is_delay_timed_out = global_state.delayed_report && (time_now >= global_state.delayed_report);
+  global_state.is_delay_timed_out = global_state.delayed_report && (time_now >= global_state.delayed_report);
   #endif
-  if (is_delay_timed_out) {
+  if (global_state.is_delay_timed_out) {
     #if DEBUG_TRIGGER_EVENT_MSGS
     Serial.println("Triggering EVENT_DELAY_TIMED_OUT");
     #endif
@@ -613,11 +607,11 @@ bool isInsideLane()
 
 void resetIsInsideLaneFlags()
 {
-  is_within_reward_lane_angle = isWithinRewardLaneAngle();
+  global_state.is_within_reward_lane_angle = isWithinRewardLaneAngle();
   #if DEBUG_W_VIRTUAL_MOUSE
-  is_inside_lane = !global_state.was_inside_lane;
+  global_state.is_inside_lane = !global_state.was_inside_lane;
   #else
-  is_inside_lane = isInsideLane();
+  global_state.is_inside_lane = isInsideLane();
   #endif
 }
 
@@ -818,7 +812,7 @@ void resetIsCorrectSensor()
   #endif
   // Call isCorrectSensor() anyway so it'd call
   // writeStats() on the touched sensor
-  is_correct_sensor = isCorrectSensor();
+  global_state.is_correct_sensor = isCorrectSensor();
 }
 
 void reward()
@@ -828,7 +822,7 @@ void reward()
   #endif
   // Report if reward was given due to correct sensor was touched or
   // due to wrong sensore touched but automated reward is enabled
-  writeStats(Stats.REWARD_GIVEN(is_correct_sensor == false));
+  writeStats(Stats.REWARD_GIVEN(global_state.is_correct_sensor == false));
   // TODO: Clean hacky way
   global_state.delayed_report = millis() + 2000;
 
@@ -1407,11 +1401,11 @@ bool isWithinRewardLaneAngle()
   return false;
 }
 
-// void move_training_servos(int angle, bool is_within_reward_lane_angle){
+// void move_training_servos(int angle, bool global_state.is_within_reward_lane_angle){
 //   if(global_state.reward_direction == 0){
 //     if(inRange(angle, -120,-90) || inRange(angle, -30,0) || inRange(angle, 60,80) || inRange(angle, 160,180)){
 //       myservoleft.write(170);
-//       if(is_within_reward_lane_angle){
+//       if(global_state.is_within_reward_lane_angle){
 //         myservoright.write(20);
 //       }
 //     }
@@ -1423,7 +1417,7 @@ bool isWithinRewardLaneAngle()
 //   else{
 //     if(inRange(angle, -120,-90) || inRange(angle, -30,0) || inRange(angle, 60,80) || inRange(angle, 160,180)){
 //       myservoright.write(20);
-//       if(is_within_reward_lane_angle){
+//       if(global_state.is_within_reward_lane_angle){
 //         myservoleft.write(170);
 //       }
 //     }
@@ -1534,7 +1528,7 @@ void pushActuator()
     global_state.last_reported_actuator_status = Actuator::PUSH;
     global_state.sensor_was_touched = false;
   }
-  motor_pushed = true;
+  global_state.motor_pushed = true;
 }
 
 void reportActuatorAtMaxPush()
@@ -1561,7 +1555,7 @@ void reportActuatorAtRest()
     Serial.print(" - MAX_PUSH_WAIT: ");
     Serial.print(global_state.MAX_PUSH_WAIT);
     Serial.print("- time_now: ");
-    Serial.println(actuator_at_rest_time_now);
+    Serial.println(global_state.actuator_at_rest_time_now);
     writeStats(Stats.MOTOR_WAIT_DONE());
     global_state.reported_motor_max_wait = true;
   }
@@ -1573,7 +1567,7 @@ void reportSensorTouched()
   Serial.println("In reportSensorTouched()");
   #endif
   // global_state.sensor_was_touched = true;
-  // if (is_correct_sensor)
+  // if (global_state.is_correct_sensor)
   //   global_state.miss_or_wrong_touch_count = 0;
   // else
   //   global_state.miss_or_wrong_touch_count += 1;
