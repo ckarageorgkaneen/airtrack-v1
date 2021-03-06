@@ -66,7 +66,8 @@ void signalNoReward();
 void beInsideLane();
 void pullActuator();
 void resetMotors();
-void turnOnActuator();
+void turnOnActuatorAtMinPull();
+void turnOnActuatorAfterDelay();
 
 struct StateStruct
 {
@@ -86,7 +87,9 @@ struct StateStruct
   State* INSIDE_LANE = new State(beInsideLane, NULL, NULL);
   State* PULL_ACTUATOR = new State(pullActuator, NULL, NULL);
   State* RESET_MOTORS = new State(resetMotors, NULL, NULL);
-  State* TURN_ON_ACTUATOR = new State(turnOnActuator, NULL, NULL);
+  State* TURN_ON_ACTUATOR_AT_MIN_PULL = new State(turnOnActuatorAtMinPull, NULL, NULL);
+  State* TURN_ON_ACTUATOR_AFTER_DELAY = new State(turnOnActuatorAfterDelay, NULL, NULL);
+
 };
 
 enum EventEnum
@@ -105,6 +108,7 @@ enum EventEnum
   EVENT_NO_REWARD,
   EVENT_PULL_ACTUATOR,
   EVENT_RESET_MOTORS,
+  EVENT_ACTUATOR_AT_MIN_PULL_UNREPORTED,
   EVENT_TURN_ON_ACTUATOR_AFTER_DELAY,
 };
 
@@ -261,12 +265,22 @@ void setup()
     EVENT_RESET_MOTORS,
     NULL);
   fsm.add_transition(
+    state.PULL_ACTUATOR,
+    state.TURN_ON_ACTUATOR_AT_MIN_PULL,
+    EVENT_ACTUATOR_AT_MIN_PULL_UNREPORTED,
+    NULL);
+  fsm.add_transition(
+    state.TURN_ON_ACTUATOR_AT_MIN_PULL,
     state.RESET_MOTORS,
-    state.TURN_ON_ACTUATOR,
+    EVENT_RESET_MOTORS,
+    NULL);
+  fsm.add_transition(
+    state.RESET_MOTORS,
+    state.TURN_ON_ACTUATOR_AFTER_DELAY,
     EVENT_TURN_ON_ACTUATOR_AFTER_DELAY,
     NULL);
   fsm.add_transition(
-    state.TURN_ON_ACTUATOR,
+    state.TURN_ON_ACTUATOR_AFTER_DELAY,
     state.RESET_SYSTEM,
     EVENT_RESET_SYSTEM,
     NULL);
@@ -332,13 +346,27 @@ void resetSystem()
 
 void turnOnActuator()
 {
-  #if DEBUG_STATE_FUNCTIONS
-  Serial.println("In turnOnActuator().");
-  #endif
   // TODO: Do it cleanly
   turnOnMotor(13, 20);
-  if (is_delay_timed_out)
-    global_state.delayed_report = 0;
+}
+
+void turnOnActuatorAtMinPull()
+{
+  #if DEBUG_STATE_FUNCTIONS
+  Serial.println("In turnOnActuatorAtMinPull().");
+  #endif
+  writeStats(Stats.MOTOR_MIN_RANGE());
+  global_state.reported_motor_min_distance = true;
+  turnOnActuator();
+}
+
+void turnOnActuatorAfterDelay()
+{
+  #if DEBUG_STATE_FUNCTIONS
+  Serial.println("In turnOnActuatorAfterDelay().");
+  #endif
+  turnOnActuator();
+  global_state.delayed_report = 0;
 }
 
 void resetMotors()
@@ -509,6 +537,22 @@ void triggerPullActuatorEvent()
   }
 }
 
+void triggerActuatorAtMinPullEvent()
+{
+  #if DEBUG_W_VIRTUAL_MOUSE
+  bool actuator_at_min_pull_unreported = true;
+  #else
+  bool actuator_at_min_pull_unreported = global_state.actuator_at_min_pull && !global_state.reported_motor_min_distance;
+  #endif
+  if (actuator_at_min_pull_unreported)
+  {
+    #if DEBUG_TRIGGER_EVENT_MSGS
+    Serial.println("Triggering EVENT_ACTUATOR_AT_MIN_PULL_UNREPORTED");
+    #endif
+    fsm.trigger(EVENT_ACTUATOR_AT_MIN_PULL_UNREPORTED);
+  }
+}
+
 void triggerResetMotorsEvent()
 {
   #if DEBUG_TRIGGER_EVENT_MSGS
@@ -546,6 +590,7 @@ void triggerNewEvents()
   triggerSensorTouchedEvent();
   triggerRewardEvents();
   triggerPullActuatorEvent();
+  triggerActuatorAtMinPullEvent();
   triggerResetMotorsEvent();
   triggerTurnOnActuatorAfterDelayEvent();
 }
@@ -1586,13 +1631,8 @@ void pullActuator()
     writeStats(Stats.MOTOR_PULLED());
     global_state.last_reported_actuator_status = Actuator::PULL;
   }
-  bool motor_min_range_condition = global_state.actuator_at_min_pull && !global_state.reported_motor_min_distance;
-  if (motor_min_range_condition) {
-    writeStats(Stats.MOTOR_MIN_RANGE());
-    turnOnActuator();
-    //digitalWrite(45, HIGH);
-  }
-  global_state.reported_motor_min_distance = motor_min_range_condition;
+  if (!global_state.actuator_at_min_pull)
+    global_state.reported_motor_min_distance = false;
 }
 
 
