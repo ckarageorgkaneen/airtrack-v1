@@ -89,7 +89,7 @@ struct StateStruct
 enum EventEnum
 {
   EVENT_RESET_SYSTEM,
-  EVENT_BE_OUTSIDE_LANE,
+  EVENT_OUTSIDE_LANE,
   EVENT_EXIT_LANE,
   EVENT_TURN_OFF_PIEZO,
   EVENT_ENTER_LANE,
@@ -121,7 +121,7 @@ void setup()
   fsm.add_transition(
     state.RESET_SYSTEM,
     state.OUTSIDE_LANE,
-    EVENT_BE_OUTSIDE_LANE,
+    EVENT_OUTSIDE_LANE,
     NULL);
   fsm.add_transition(
     state.RESET_SYSTEM,
@@ -494,9 +494,9 @@ void triggerOutsideLaneEvents()
     fsm.trigger(EVENT_EXIT_LANE);
   } else if (!global_state.is_inside_lane) {
     #if DEBUG_TRIGGER_EVENT_MSGS
-    Serial.println("Triggering EVENT_BE_OUTSIDE_LANE");
+    Serial.println("Triggering EVENT_OUTSIDE_LANE");
     #endif
-    fsm.trigger(EVENT_BE_OUTSIDE_LANE);
+    fsm.trigger(EVENT_OUTSIDE_LANE);
   }
 }
 
