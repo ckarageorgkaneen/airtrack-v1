@@ -44,8 +44,11 @@ SensorTouched touched_sensor = SensorTouched(false, false);
 SubjectLocation subject_location;
 
 void initSystem();
+void resetActuator();
+void resetA9();
+void resetSubjectState();
 void makeNewRewardLane();
-void resetSystem();
+void pulsePumpActivator();
 void exitLane();
 void turnOffPiezo();
 void beOutsideLane();
@@ -66,7 +69,10 @@ void turnOnActuatorAfterDelay();
 struct StateStruct
 {
   State* INITIALIZE = new State(initSystem, NULL, NULL);
-  State* RESET_SYSTEM = new State(resetSystem, NULL, NULL);
+  State* RESET_ACTUATOR = new State(resetActuator, NULL, NULL);
+  State* RESET_A9 = new State(resetA9, NULL, NULL);
+  State* RESET_SUBJECT_STATE = new State(resetSubjectState, NULL, NULL);
+  State* PULSE_PUMP_ACTIVATOR = new State(pulsePumpActivator, NULL, NULL);
   State* EXIT_LANE = new State(exitLane, NULL, NULL);
   State* TURN_OFF_PIEZO = new State(turnOffPiezo, NULL, NULL);
   State* OUTSIDE_LANE = new State(beOutsideLane, NULL, NULL);
@@ -83,12 +89,13 @@ struct StateStruct
   State* RESET_MOTORS = new State(resetMotors, NULL, NULL);
   State* TURN_ON_ACTUATOR_AT_MIN_PULL = new State(turnOnActuatorAtMinPull, NULL, NULL);
   State* TURN_ON_ACTUATOR_AFTER_DELAY = new State(turnOnActuatorAfterDelay, NULL, NULL);
-
 };
 
 enum EventEnum
 {
-  EVENT_RESET_SYSTEM,
+  EVENT_RESET_ACTUATOR,
+  EVENT_RESET_A9,
+  EVENT_PULSE_PUMP_ACTIVATOR,
   EVENT_OUTSIDE_LANE,
   EVENT_EXIT_LANE,
   EVENT_TURN_OFF_PIEZO,
@@ -115,16 +122,41 @@ void setup()
   Serial.begin(115200);
   fsm.add_transition(
     state.INITIALIZE,
-    state.RESET_SYSTEM,
-    EVENT_RESET_SYSTEM,
+    state.RESET_ACTUATOR,
+    EVENT_RESET_ACTUATOR,
     NULL);
   fsm.add_transition(
-    state.RESET_SYSTEM,
+    state.INITIALIZE,
+    state.RESET_A9,
+    EVENT_RESET_A9,
+    NULL);
+  fsm.add_transition(
+    state.RESET_ACTUATOR,
+    state.RESET_A9,
+    EVENT_RESET_A9,
+    NULL);
+  fsm.add_transition(
+    state.RESET_A9,
+    state.PULSE_PUMP_ACTIVATOR,
+    EVENT_PULSE_PUMP_ACTIVATOR,
+    NULL);
+  fsm.add_timed_transition(
+    state.RESET_A9,
+    state.RESET_SUBJECT_STATE,
+    NO_DELAY,
+    NULL);
+  fsm.add_timed_transition(
+    state.PULSE_PUMP_ACTIVATOR,
+    state.RESET_SUBJECT_STATE,
+    NO_DELAY,
+    NULL);
+  fsm.add_transition(
+    state.RESET_SUBJECT_STATE,
     state.OUTSIDE_LANE,
     EVENT_OUTSIDE_LANE,
     NULL);
   fsm.add_transition(
-    state.RESET_SYSTEM,
+    state.RESET_SUBJECT_STATE,
     state.EXIT_LANE,
     EVENT_EXIT_LANE,
     NULL);
@@ -154,7 +186,7 @@ void setup()
     EVENT_RESET_MOTORS,
     NULL);
   fsm.add_transition(
-    state.RESET_SYSTEM,
+    state.RESET_SUBJECT_STATE,
     state.ENTER_LANE,
     EVENT_ENTER_LANE,
     NULL);
@@ -275,13 +307,23 @@ void setup()
     NULL);
   fsm.add_transition(
     state.TURN_ON_ACTUATOR_AFTER_DELAY,
-    state.RESET_SYSTEM,
-    EVENT_RESET_SYSTEM,
+    state.RESET_ACTUATOR,
+    EVENT_RESET_ACTUATOR,
+    NULL);
+  fsm.add_transition(
+    state.TURN_ON_ACTUATOR_AFTER_DELAY,
+    state.RESET_A9,
+    EVENT_RESET_A9,
     NULL);
   fsm.add_transition(
     state.RESET_MOTORS,
-    state.RESET_SYSTEM,
-    EVENT_RESET_SYSTEM,
+    state.RESET_ACTUATOR,
+    EVENT_RESET_ACTUATOR,
+    NULL);
+  fsm.add_transition(
+    state.RESET_MOTORS,
+    state.RESET_A9,
+    EVENT_RESET_A9,
     NULL);
 }
 
@@ -312,18 +354,26 @@ void initSystem()
   Serial.println("Done initializing system.");
 }
 
-void resetSystem()
+void resetA9()
 {
   #if DEBUG_STATE_FUNCTIONS
-  Serial.println("In resetSystem().");
+  Serial.println("In resetA9().");
   #endif
-  if(digitalRead(25) == LOW)
-    resetActuator();
   digitalWrite(A9,LOW);
-  if(digitalRead(23) == HIGH)
-    pulsePumpActivator();
+}
+
+void resetSubjectState()
+{
+  #if DEBUG_STATE_FUNCTIONS
+  Serial.println("In resetSubjectState().");
+  #endif
   resetSubjectLocation();
-  resetIsInsideLaneFlags();
+  global_state.is_within_reward_lane_angle = isWithinRewardLaneAngle();
+  #if DEBUG_W_VIRTUAL_MOUSE
+  global_state.is_inside_lane = !global_state.was_inside_lane;
+  #else
+  global_state.is_inside_lane = isInsideLane();
+  #endif
   //move_training_servos(subject_location.angle, global_state.is_within_reward_lane_angle);
   global_state.motor_pushed = false;
   // if(time_counter < TIME_UNTIL_TRAINING + 10 && !global_state.is_within_reward_lane_angle){
@@ -372,12 +422,42 @@ void resetMotors()
   actuator.motorLoop();
 }
 
-void triggerResetSystemEvent()
+void triggerResetActuator()
+{
+  #if DEBUG_W_VIRTUAL_MOUSE
+  bool reset_actuator_condition = true;
+  #else
+  bool reset_actuator_condition = digitalRead(25) == LOW;
+  #endif
+  if (reset_actuator_condition) {
+    #if DEBUG_TRIGGER_EVENT_MSGS
+    Serial.println("Triggering EVENT_RESET_ACTUATOR");
+    #endif
+    fsm.trigger(EVENT_RESET_ACTUATOR);
+  }
+}
+
+void triggerResetA9()
 {
   #if DEBUG_TRIGGER_EVENT_MSGS
-  Serial.println("Triggering EVENT_RESET_SYSTEM");
+  Serial.println("Triggering EVENT_RESET_A9");
   #endif
-  fsm.trigger(EVENT_RESET_SYSTEM);
+  fsm.trigger(EVENT_RESET_A9);
+}
+
+void triggerPulsePumpActivator()
+{
+  #if DEBUG_W_VIRTUAL_MOUSE
+  bool trigger_condition = true;
+  #else
+  bool trigger_condition = digitalRead(23) == HIGH;
+  #endif
+  if (trigger_condition) {
+    #if DEBUG_TRIGGER_EVENT_MSGS
+    Serial.println("Triggering EVENT_PULSE_PUMP_ACTIVATOR");
+    #endif
+    fsm.trigger(EVENT_PULSE_PUMP_ACTIVATOR);
+  }
 }
 
 void triggerEnterLaneEvent()
@@ -573,7 +653,9 @@ void triggerDelayTimedOutEvent()
 
 void triggerNewEvents()
 {
-  triggerResetSystemEvent();
+  triggerResetActuator();
+  triggerResetA9();
+  triggerPulsePumpActivator();
   triggerOutsideLaneEvents();
   triggerTurnOffPiezoEvent();
   triggerEnterLaneEvent();
@@ -605,15 +687,7 @@ bool isInsideLane()
    subject_location.y        < Distances.y_threshold_max;
 }
 
-void resetIsInsideLaneFlags()
-{
-  global_state.is_within_reward_lane_angle = isWithinRewardLaneAngle();
-  #if DEBUG_W_VIRTUAL_MOUSE
-  global_state.is_inside_lane = !global_state.was_inside_lane;
-  #else
-  global_state.is_inside_lane = isInsideLane();
-  #endif
-}
+
 
 bool shouldTriggerMotor()
 {
@@ -1244,7 +1318,9 @@ void setupPixy()
 
 void resetActuator()
 {
-  Serial.println("Resetting actuator.");
+  #if DEBUG_STATE_FUNCTIONS
+  Serial.println("In resetActuator()");
+  #endif
   digitalWrite(A9,HIGH);
   delay(300);
   while(digitalRead(25) == HIGH)
@@ -1262,6 +1338,9 @@ void resetActuator()
     {
       actuator.enableStill();
     }
+    #if DEBUG_W_VIRTUAL_MOUSE
+    break;
+    #endif
   }
   actuator.setMaxDistance(actuator.getMotorDist());
   actuator.setup();
@@ -1272,12 +1351,13 @@ void resetActuator()
 
 void pulsePumpActivator()
 {
+  #if DEBUG_STATE_FUNCTIONS
+  Serial.println("In pulsePumpActivator().");
+  #endif
   //turnOnMotor(Pins.SolenoidLeft, global_state.SOLENOID_DURATION);
-  Serial.println("Pulsing pump activator.");
   digitalWrite(PIN_PUMP_ACTIVATOR_PULSE, HIGH);
   delayMicroseconds(100);
   digitalWrite(PIN_PUMP_ACTIVATOR_PULSE,LOW);
-  Serial.println("Pump activator pulsed.");
 }
 
 bool isWithinRewardLaneAngle()
