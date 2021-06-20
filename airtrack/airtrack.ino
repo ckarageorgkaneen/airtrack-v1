@@ -16,7 +16,7 @@
 #define DEBUG false
 #define DEBUG_STATE_FUNCTIONS DEBUG || false
 #define DEBUG_TRIGGER_EVENT_MSGS DEBUG || false
-#define DEBUG_W_VIRTUAL_MOUSE DEBUG || false
+#define ENABLE_VIRTUAL_MOUSE DEBUG && false
 #define AUTOMATED_REWARD true
 #define SINGLE_REWARD true
 #define FEEDBACK_AUTOMATED_REWARD false
@@ -369,7 +369,7 @@ void resetSubjectState()
   #endif
   resetSubjectLocation();
   global_state.is_within_reward_lane_angle = isWithinRewardLaneAngle();
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   global_state.is_inside_lane = !global_state.was_inside_lane;
   #else
   global_state.is_inside_lane = isInsideLane();
@@ -424,7 +424,7 @@ void resetMotors()
 
 void triggerResetActuator()
 {
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   bool reset_actuator_condition = true;
   #else
   bool reset_actuator_condition = digitalRead(25) == LOW;
@@ -447,7 +447,7 @@ void triggerResetA9()
 
 void triggerPulsePumpActivator()
 {
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   bool trigger_condition = true;
   #else
   bool trigger_condition = digitalRead(23) == HIGH;
@@ -472,7 +472,7 @@ void triggerEnterLaneEvent()
 
 void triggerPushActuatorEvent()
 {
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   bool push_actuator_condition = true;
   #else
   bool push_actuator_condition = global_state.is_within_reward_lane_angle && shouldTriggerMotor();
@@ -487,7 +487,7 @@ void triggerPushActuatorEvent()
 
 void triggerActuatorAtMaxPushEvent()
 {
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   bool actuator_is_at_max_push = true;
   #else
   bool actuator_is_at_max_push = global_state.actuator_at_max_push;
@@ -505,7 +505,7 @@ void triggerActuatorAtRestEvent()
   // Allow a bit of buffer time for sensor vibration to
   // rest before reading
   long int time_now = millis();
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   bool max_push_wait_exceeded = true;
   #else
   bool max_push_wait_exceeded = global_state.max_push_current_duration <= time_now - global_state.MAX_PUSH_WAIT;
@@ -529,7 +529,7 @@ void triggerResetIsCorrectSensor()
 
 void triggerSensorTouchedEvent()
 {
-  // #if DEBUG_W_VIRTUAL_MOUSE
+  // #if ENABLE_VIRTUAL_MOUSE
   // bool sensor_was_touched = true;
   // #else
   // bool sensor_was_touched = touched_sensor.change_happened && !global_state.sensor_was_touched;
@@ -544,7 +544,7 @@ void triggerSensorTouchedEvent()
 
 void triggerRewardEvents()
 {
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   bool decide_reward_condition = true;
   #else
   bool decide_reward_condition = (global_state.is_automated_reward || touched_sensor.change_happened) && !global_state.reward_given;
@@ -582,7 +582,7 @@ void triggerOutsideLaneEvents()
 
 void triggerTurnOffPiezoEvent()
 {
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   bool turn_off_piezo_condition = true;
   #else
   bool turn_off_piezo_condition = global_state.piezo_motor_entry != NULL;
@@ -597,7 +597,7 @@ void triggerTurnOffPiezoEvent()
 
 void triggerPullActuatorEvent()
 {
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   bool pull_actuator_condition = true;
   #else
   bool pull_actuator_condition = subject_location.block_detected && !global_state.motor_pushed;
@@ -613,7 +613,7 @@ void triggerPullActuatorEvent()
 
 void triggerActuatorAtMinPullEvent()
 {
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   bool actuator_at_min_pull_unreported = true;
   #else
   bool actuator_at_min_pull_unreported = global_state.actuator_at_min_pull && !global_state.reported_motor_min_distance;
@@ -637,7 +637,7 @@ void triggerResetMotorsEvent()
 
 void triggerDelayTimedOutEvent()
 {
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   global_state.is_delay_timed_out = true;
   #else
   long int time_now = millis();
@@ -1338,7 +1338,7 @@ void resetActuator()
     {
       actuator.enableStill();
     }
-    #if DEBUG_W_VIRTUAL_MOUSE
+    #if ENABLE_VIRTUAL_MOUSE
     break;
     #endif
   }
@@ -1675,7 +1675,7 @@ void turnOffPiezo()
   #endif
   do
     digitalWrite(global_state.piezo_motor_entry->motor_id, LOW);
-  #if DEBUG_W_VIRTUAL_MOUSE
+  #if ENABLE_VIRTUAL_MOUSE
   while (false);
   #else
   while (digitalRead(global_state.piezo_motor_entry->motor_id));
