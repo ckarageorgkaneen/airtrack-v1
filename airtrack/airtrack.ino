@@ -57,7 +57,6 @@ void pushActuator();
 void reportActuatorAtMaxPush();
 void reportActuatorAtRest();
 void resetIsCorrectSensor();
-void reportSensorTouched();
 void reward();
 void signalNoReward();
 void beInsideLane();
@@ -80,7 +79,6 @@ struct StateStruct
   State* PUSH_ACTUATOR = new State(pushActuator, NULL, NULL);
   State* ACTUATOR_AT_MAX_PUSH = new State(reportActuatorAtMaxPush, NULL, NULL);
   State* ACTUATOR_AT_REST = new State(reportActuatorAtRest, NULL, NULL);
-  State* SENSOR_TOUCHED = new State(reportSensorTouched, NULL, NULL);
   State* REWARD = new State(reward, NULL, NULL);
   State* NO_REWARD = new State(signalNoReward, NULL, NULL);
   State* INSIDE_LANE = new State(beInsideLane, NULL, NULL);
@@ -102,7 +100,6 @@ enum EventEnum
   EVENT_PUSH_ACTUATOR,
   EVENT_ACTUATOR_AT_MAX_PUSH,
   EVENT_ACTUATOR_AT_REST,
-  EVENT_SENSOR_TOUCHED,
   EVENT_REWARD,
   EVENT_NO_REWARD,
   EVENT_PULL_ACTUATOR,
@@ -225,21 +222,6 @@ void setup()
     NULL);
   fsm.add_timed_transition(
     state.ACTUATOR_AT_REST,
-    state.INSIDE_LANE,
-    NO_DELAY,
-    NULL);
-  fsm.add_transition(
-    state.SENSOR_TOUCHED,
-    state.REWARD,
-    EVENT_REWARD,
-    NULL);
-  fsm.add_transition(
-    state.SENSOR_TOUCHED,
-    state.NO_REWARD,
-    EVENT_NO_REWARD,
-    NULL);
-  fsm.add_timed_transition(
-    state.SENSOR_TOUCHED,
     state.INSIDE_LANE,
     NO_DELAY,
     NULL);
@@ -1608,18 +1590,6 @@ void reportActuatorAtRest()
     writeStats(Stats.MOTOR_WAIT_DONE());
     global_state.reported_motor_max_wait = true;
   }
-}
-
-void reportSensorTouched()
-{
-  #if DEBUG_STATE_FUNCTIONS
-  Serial.println("In reportSensorTouched()");
-  #endif
-  // global_state.sensor_was_touched = true;
-  // if (global_state.is_correct_sensor)
-  //   global_state.miss_or_wrong_touch_count = 0;
-  // else
-  //   global_state.miss_or_wrong_touch_count += 1;
 }
 
 void beInsideLane(){
