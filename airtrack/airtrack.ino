@@ -17,6 +17,69 @@
 #define DEBUG_STATE_FUNCTIONS DEBUG || false
 #define DEBUG_TRIGGER_EVENT_MSGS DEBUG || false
 #define ENABLE_VIRTUAL_MOUSE DEBUG && false
+#if ENABLE_VIRTUAL_MOUSE
+#define HELPER_LED 37
+#endif
+#if ENABLE_VIRTUAL_MOUSE
+void blocking_turn_on_pin(const int pin, const float duration,
+                          const bool blink_, const float delay_)
+{
+  long int start_time = millis();
+  long int end_time = start_time;
+  if (blink_)
+  {
+    int counter = 0;
+    while ((end_time - start_time) <= (delay_ + 1) * duration * 1000)
+    {
+     digitalWrite(pin, counter++ % 2);
+     end_time = millis();
+     delay(delay_ * 1000);
+    }
+  }
+  else
+  {
+   digitalWrite(pin, HIGH);
+   while ((end_time - start_time) <= duration * 1000)
+    end_time = millis();
+  }
+  digitalWrite(pin, LOW);
+}
+void blocking_simulate_reward(const float actuator_duration, const float blink_duration, const float blink_delay)
+{
+  // Push actuator
+  long int start_time = millis();
+  long int end_time = start_time;
+  digitalWrite(Pins.ActuatorPull, LOW);
+  digitalWrite(Pins.ActuatorPush, HIGH);
+  while ((end_time - start_time) <= actuator_duration * 1000)
+    end_time = millis();
+  digitalWrite(Pins.ActuatorPush, LOW);
+  // Blink LEDs indicating reward being given
+  start_time = millis();
+  end_time = start_time;
+  int counter = 0;
+  while ((end_time - start_time) <= (blink_delay + 1) * blink_duration * 1000)
+  {
+    bool voltage = counter++ % 2;
+    digitalWrite(Pins.LaneLight, voltage);
+    digitalWrite(Pins.LaneLight2, voltage);
+    digitalWrite(HELPER_LED, voltage);
+    end_time = millis();
+    delay(blink_delay * 1000);
+  }
+  digitalWrite(Pins.LaneLight, LOW);
+  digitalWrite(Pins.LaneLight2, LOW);
+  digitalWrite(HELPER_LED, LOW);
+  // Pull actuator
+  start_time = millis();
+  end_time = start_time;
+  digitalWrite(Pins.ActuatorPull, HIGH);
+  digitalWrite(Pins.ActuatorPush, LOW);
+  while ((end_time - start_time) <= actuator_duration * 1000)
+    end_time = millis();
+  digitalWrite(Pins.ActuatorPull, LOW);
+}
+#endif
 #define AUTOMATED_REWARD true
 #define SINGLE_REWARD true
 #define FEEDBACK_AUTOMATED_REWARD false
@@ -894,6 +957,9 @@ void reward()
   #if DEBUG_STATE_FUNCTIONS
   Serial.println("In reward()");
   #endif
+  #if ENABLE_VIRTUAL_MOUSE
+  blocking_simulate_reward(3, 3, 0.5);
+  #endif
   // Report if reward was given due to correct sensor was touched or
   // due to wrong sensore touched but automated reward is enabled
   writeStats(Stats.REWARD_GIVEN(global_state.is_correct_sensor == false));
@@ -1171,6 +1237,11 @@ void setActuatorTimeout(long int actuator_time_out)
 void setupPins()
 {
   Serial.println("Setting up Pins.");
+  #if ENABLE_VIRTUAL_MOUSE
+  // Helper LEDs
+  pinMode(HELPER_LED, OUTPUT);
+  digitalWrite(HELPER_LED, LOW);
+  #endif
   // Solenoid
   pinMode(Pins.SolenoidLeft, OUTPUT);
   pinMode(Pins.SolenoidRight, OUTPUT);
@@ -1592,6 +1663,11 @@ void enterLane()
   #if DEBUG_STATE_FUNCTIONS
   Serial.println("In enterLane()");
   #endif
+  #if ENABLE_VIRTUAL_MOUSE
+  blocking_turn_on_pin(HELPER_LED, 4, true, 0.09);
+  // Simulate being inside lane
+  blocking_turn_on_pin(Pins.LaneLight2, 3, NULL, NULL);
+  #endif
   if (!global_state.was_inside_lane)
     writeStats(Stats.ENTERED_LANE(global_state.current_lane));
 }
@@ -1657,6 +1733,9 @@ void beInsideLane(){
   #if DEBUG_STATE_FUNCTIONS
   Serial.println("In beInsideLane()");
   #endif
+  #if ENABLE_VIRTUAL_MOUSE
+  blocking_turn_on_pin(Pins.LaneLight2, 3, NULL, NULL);
+  #endif
   global_state.was_inside_lane = true;
 }
 
@@ -1664,6 +1743,9 @@ void exitLane()
 {
   #if DEBUG_STATE_FUNCTIONS
   Serial.println("In exitLane()");
+  #endif
+  #if ENABLE_VIRTUAL_MOUSE
+  blocking_turn_on_pin(HELPER_LED, 4, true, 0.09);
   #endif
   writeStats(Stats.EXITED_LANE(global_state.current_lane));
 }
@@ -1688,6 +1770,9 @@ void beOutsideLane()
 {
   #if DEBUG_STATE_FUNCTIONS
   Serial.println("In beOutsideLane()");
+  #endif
+  #if ENABLE_VIRTUAL_MOUSE
+  blocking_turn_on_pin(Pins.LaneLight, 3, NULL, NULL);
   #endif
   global_state.was_inside_lane = false;
   global_state.reported_motor_max_distance = false;
