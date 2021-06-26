@@ -80,7 +80,6 @@ struct StateStruct
   State* PUSH_ACTUATOR = new State(pushActuator, NULL, NULL);
   State* ACTUATOR_AT_MAX_PUSH = new State(reportActuatorAtMaxPush, NULL, NULL);
   State* ACTUATOR_AT_REST = new State(reportActuatorAtRest, NULL, NULL);
-  State* RESET_IS_CORRECT_SENSOR = new State(resetIsCorrectSensor, NULL, NULL);
   State* SENSOR_TOUCHED = new State(reportSensorTouched, NULL, NULL);
   State* REWARD = new State(reward, NULL, NULL);
   State* NO_REWARD = new State(signalNoReward, NULL, NULL);
@@ -103,7 +102,6 @@ enum EventEnum
   EVENT_PUSH_ACTUATOR,
   EVENT_ACTUATOR_AT_MAX_PUSH,
   EVENT_ACTUATOR_AT_REST,
-  EVENT_RESET_IS_CORRECT_SENSOR,
   EVENT_SENSOR_TOUCHED,
   EVENT_REWARD,
   EVENT_NO_REWARD,
@@ -222,31 +220,11 @@ void setup()
     NULL);
   fsm.add_transition(
     state.ACTUATOR_AT_REST,
-    state.RESET_IS_CORRECT_SENSOR,
-    EVENT_RESET_IS_CORRECT_SENSOR,
-    NULL);
-  fsm.add_timed_transition(
-    state.ACTUATOR_AT_REST,
-    state.INSIDE_LANE,
-    NO_DELAY,
-    NULL);
-  fsm.add_transition(
-    state.RESET_IS_CORRECT_SENSOR,
-    state.SENSOR_TOUCHED,
-    EVENT_SENSOR_TOUCHED,
-    NULL);
-  fsm.add_transition(
-    state.RESET_IS_CORRECT_SENSOR,
     state.REWARD,
     EVENT_REWARD,
     NULL);
-  fsm.add_transition(
-    state.RESET_IS_CORRECT_SENSOR,
-    state.NO_REWARD,
-    EVENT_NO_REWARD,
-    NULL);
   fsm.add_timed_transition(
-    state.RESET_IS_CORRECT_SENSOR,
+    state.ACTUATOR_AT_REST,
     state.INSIDE_LANE,
     NO_DELAY,
     NULL);
@@ -519,14 +497,6 @@ void triggerActuatorAtRestEvent()
   }
 }
 
-void triggerResetIsCorrectSensor()
-{
-  #if DEBUG_TRIGGER_EVENT_MSGS
-  Serial.println("Triggering EVENT_RESET_IS_CORRECT_SENSOR");
-  #endif
-  fsm.trigger(EVENT_RESET_IS_CORRECT_SENSOR);
-}
-
 void triggerSensorTouchedEvent()
 {
   // #if ENABLE_VIRTUAL_MOUSE
@@ -662,7 +632,6 @@ void triggerNewEvents()
   triggerPushActuatorEvent();
   triggerActuatorAtMaxPushEvent();
   triggerActuatorAtRestEvent();
-  triggerResetIsCorrectSensor();
   triggerSensorTouchedEvent();
   triggerRewardEvents();
   triggerPullActuatorEvent();
